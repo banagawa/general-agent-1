@@ -1,19 +1,24 @@
+from pathlib import Path
+from sandbox.mounts import WORKSPACE_ROOT
 from policy.engine import PolicyEngine
+from tools.fs_tools import FileSystemTools
 from audit.log import log_event
-from sandbox.mounts import get_workspace_root
-
 
 class ToolGateway:
     def __init__(self):
         self.policy = PolicyEngine()
-        self.workspace_root = get_workspace_root()
+        self.fs = FileSystemTools()
 
     def search_files(self, query: str):
-        log_event(f"SEARCH requested: {query}")
-        # Real implementation tomorrow
-        return []
+        log_event("FS_SEARCH", query)
+        return self.fs.search(WORKSPACE_ROOT, query)
 
-    def read_file(self, path: str):
-        log_event(f"READ requested: {path}")
-        # Real implementation tomorrow
-        return "[STUB] read_file not implemented yet"
+    def read_abs_path(self, path: Path):
+        # Enforce policy for reads
+        if not self.policy.is_allowed("FS_READ", path):
+            log_event("DENY_READ", str(path))
+            raise PermissionError(f"Access denied: {path}")
+
+        log_event("ALLOW_READ", str(path))
+        return self.fs.read(path)
+

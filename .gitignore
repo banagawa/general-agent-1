@@ -7,3 +7,7 @@ venv/
 env/
 
 .DS_Store
+.audit/
+.env
+workspace/
+outside.txt
