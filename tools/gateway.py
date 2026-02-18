@@ -12,6 +12,14 @@ class ToolGateway:
     def search_files(self, query: str):
         log_event("FS_SEARCH", query)
         return self.fs.search(WORKSPACE_ROOT, query)
+        allowed = []
+        for path in results:
+            if self.policy.is_allowed("FS_READ", path):
+                allowed.append(path)
+            else:
+                log_event("DENY_SEARCH_RESULT", str(path))
+
+        return allowed
 
     def read_abs_path(self, path: Path):
         # Enforce policy for reads

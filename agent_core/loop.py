@@ -1,4 +1,5 @@
 from tools.gateway import ToolGateway
+from sandbox.mounts import WORKSPACE_ROOT
 
 class AgentLoop:
     def __init__(self,gateway):
@@ -19,7 +20,8 @@ class AgentLoop:
                 # p is a Path from fs_tools.search
                 content = self.gateway.read_abs_path(p)
                 snippet = content[:400].replace("\n", " ")
-                out.append(f"- {p}: {snippet}")
+                relative = p.relative_to(WORKSPACE_ROOT)
+                out.append(f"- {relative}: {snippet}")
 
             return "\n".join(out)
 
