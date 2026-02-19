@@ -1,4 +1,5 @@
 from pathlib import Path
+import difflib
 
 MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024  # 2MB
 
@@ -30,4 +31,23 @@ class FileSystemTools:
             return path.read_text(errors="ignore")[:max_chars]
         except Exception:
             return "[ERROR: unable to read file]"
+
+    def apply_patch(self, path: Path, new_content: str):
+        try:
+            original = path.read_text(errors="ignore")
+            diff = list(difflib.unified_diff(
+                original.splitlines(keepends=True),
+                new_content.splitlines(keepends=True),
+                fromfile="original",
+                tofile="modified",
+            ))
+
+            if not diff:
+                return "[NO CHANGES DETECTED]"
+
+            path.write_text(new_content)
+            return "".join(diff)
+
+        except Exception as e:
+            return f"[ERROR applying patch: {e}]"
 

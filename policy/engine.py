@@ -21,6 +21,9 @@ class PolicyEngine:
             if pattern in str(resolved):
                 return False
 
-        # For now: allow only FS_READ
-        return action == "FS_READ"
+        # Day 4: allow read, search, and patch-based writes
+        if action not in ("FS_READ", "FS_SEARCH", "FS_WRITE_PATCH"):
+            return False
+
+        return True
 

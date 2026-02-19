@@ -30,5 +30,24 @@ class AgentLoop:
             paths = self.gateway.search_files(query)
             return "\n".join(str(p) for p in paths[:20]) if paths else "No matches."
 
+        if task.lower().startswith("update file:"):
+            parts = task.split(":", 2)
+            if len(parts) < 3:
+                return "Usage: update file: <relative_path>: <new content>"
+
+            rel_path = parts[1].strip()
+            new_content = parts[2].strip()
+
+            from sandbox.mounts import WORKSPACE_ROOT
+            full_path = (WORKSPACE_ROOT / rel_path).resolve()
+
+            try:
+                diff = self.gateway.write_file(full_path, new_content)
+                return f"Patch applied:\n{diff}"
+            except Exception as e:
+                return str(e)
+
+
         return f"[STUB] Agent received task: {task}"
+
 

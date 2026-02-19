@@ -30,3 +30,11 @@ class ToolGateway:
         log_event("ALLOW_READ", str(path))
         return self.fs.read(path)
 
+    def write_file(self, path: Path, new_content: str):
+        if not self.policy.is_allowed("FS_WRITE_PATCH", path):
+            log_event("DENY_WRITE", str(path))
+            raise PermissionError(f"Write denied: {path}")
+
+        diff = self.fs.apply_patch(path, new_content)
+        log_event("ALLOW_WRITE", str(path))
+        return diff
