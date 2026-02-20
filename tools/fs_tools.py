@@ -32,6 +32,16 @@ class FileSystemTools:
         except Exception:
             return "[ERROR: unable to read file]"
 
+    def preview_diff(self, original: str, new_content: str) -> str:
+        diff = difflib.unified_diff(
+            original.splitlines(keepends=True),
+            new_content.splitlines(keepends=True),
+            fromfile="original",
+            tofile="proposed",
+        )
+        out = "".join(diff)
+        return out if out.strip() else "[NO CHANGES DETECTED]"
+
     def apply_patch(self, path: Path, new_content: str):
         try:
             original = path.read_text(errors="ignore")

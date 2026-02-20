@@ -3,7 +3,7 @@ from sandbox.mounts import WORKSPACE_ROOT
 from policy.engine import PolicyEngine
 from tools.fs_tools import FileSystemTools
 from audit.log import log_event
-
+from policy.revocations import writes_revoked
 class ToolGateway:
     def __init__(self):
         self.policy = PolicyEngine()
@@ -31,6 +31,11 @@ class ToolGateway:
         return self.fs.read(path)
 
     def write_file(self, path: Path, new_content: str):
+
+        if writes_revoked():
+            log_event("DENY_WRITE", f"{path} reason=revoked")
+            raise PermissionError("Write denied: writes are revoked")
+
         if not self.policy.is_allowed("FS_WRITE_PATCH", path):
             log_event("DENY_WRITE", str(path))
             raise PermissionError(f"Write denied: {path}")
