@@ -4,6 +4,7 @@ from agent_core.patches import new_patch, PatchProposal
 from policy.revocations import writes_revoked
 from audit.log import log_event
 from agent_core.pending_store import load_pending, save_pending
+import ast
 
 class AgentLoop:
     def __init__(self,gateway):
@@ -89,13 +90,13 @@ class AgentLoop:
                 log_event("DENY_APPROVE", f"id={patch_id} reason=revoked")
                 return "Denied: writes are revoked"
             patch_id = task.split(":", 1)[1].strip()
-
+        
             proposal = self.pending.get(patch_id)
             if not proposal:
                 return f"Unknown PATCH_ID: {patch_id}"
-
+        
             full_path = (WORKSPACE_ROOT / proposal.rel_path).resolve()
-
+        
             try:
                 diff = self.gateway.write_file(full_path, proposal.new_content)
                 log_event("APPROVE_PATCH", f"id={patch_id} path={proposal.rel_path}")
@@ -105,13 +106,39 @@ class AgentLoop:
             except Exception as e:
                 log_event("DENY_APPROVE", f"id={patch_id} err={e}")
                 return str(e)
-
+        
         if task.lower().strip() == "revoke writes":
             writes_revoked()
             log_event("REVOKE_WRITES", "writes_revoked=true")
             return "Writes revoked."
-
-
+        
+        if task.lower().startswith("cmd.run:"):
+        
+            raw = task.split(":", 1)[1].strip()
+        
+            try:
+                argv = ast.literal_eval(raw)
+            except Exception:
+                return "Usage: cmd.run: ['python','--version']"
+        
+            result = self.gateway.cmd_run(argv)
+            return str(result)
+        
+        if task.lower().startswith("cmd.run"):
+            # Expect: cmd.run ["python","--version"]
+        
+            try:
+                start = task.index("[")
+                end = task.rindex("]") + 1
+                argv_literal = task[start:end]
+                argv = ast.literal_eval(argv_literal)
+            except Exception:
+                return "Usage: cmd.run [\"python\",\"--version\"]"
+        
+            try:
+                result = self.gateway.cmd_run(argv)
+                return str(result)
+            except Exception as e:
+                return str(e)
+        
         return f"[STUB] Agent received task: {task}"
-
-

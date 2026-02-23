@@ -1,56 +1,165 @@
-# general-agent-1
-# Internal Agent
+# General Agent — Permissioned Internal Execution System
 
-Hybrid supervised/autonomous internal assistant with sandboxed local file access and revocable permissions.
+General Agent is a permission-enforced, workspace-bounded execution system designed for controlled file operations and allowlisted command execution.
 
-## Mission (v1)
-
-This agent exists to safely read, summarize, and propose changes to local workspace files.
-
-It is not allowed to modify files, run commands, or access external systems without explicit permission.
+This is **not** an autonomous agent.  
+This is a fail-closed, auditable, policy-driven execution core.
 
 ---
 
-## Design Principles
+## Core Principles
 
-- Deny by default
-- All tool access goes through a Tool Gateway
-- Permissions are scoped, time-bound, and revocable
-- Writes use patch/diff-based edits
-- All actions are logged
-
----
-
-## Initial Scope (MVP)
-
-Workspace: (to be defined in config)
-
-First job:
-- Find files and summarize their contents
-
-No write capability yet.
-No command execution yet.
-No network access.
+- Deny-by-default
+- Workspace-bounded execution
+- Patch-only mutation
+- Explicit approval for writes
+- No shell passthrough
+- Auditable lifecycle
+- Fail-closed enforcement
 
 ---
 
-## Architecture Overview
+## Architecture Spine
 
-User → Orchestrator → Tool Gateway → Policy Engine → Sandbox Runtime
+Orchestrator  
+→ AgentLoop  
+→ ToolGateway  
+→ PolicyEngine  
+→ Tool Implementations  
 
-The model never directly touches the filesystem.
+All tool calls must pass through ToolGateway.
+
+There are no direct tool invocations.
+
+# Minimal Architecture Diagram
+
+All execution flows through a single enforcement spine.
+
+User/CLI Request
+   |
+   v
+main.py
+   |
+   v
+Orchestrator
+   |
+   v
+AgentLoop
+   |
+   v
+ToolGateway  <--- single choke point for all tools (audit + policy)
+   |
+   +--> PolicyEngine (deny-by-default, workspace boundary, deny patterns)
+   |
+   +--> Tool Implementations
+         - FS tools (search/read)
+         - Patch write tools (propose/approve)
+         - CMD_RUN (allowlisted subprocess, shell=False)
+   |
+   v
+Audit Log (.audit/audit.jsonl)
+
 
 ---
 
-## Current Status
+## Critical Invariant
 
-Day 1: Repo initialized.
-Structure scaffolded.
-No real functionality yet.
+No tool may be invoked directly from the loop or orchestrator.
+
+All actions must pass through:
+
+AgentLoop → ToolGateway → PolicyEngine → Tool
+
+If this invariant is broken, the system’s security model is compromised.
 
 ---
 
-## How to Run (Placeholder)
+## Current Capabilities
+
+### Read-Only Operations
+- File search (extension filtered)
+- File read (size capped)
+- Workspace boundary enforcement
+- Persistent audit logging
+
+### Controlled Mutation
+- Patch-based writes only
+- Proposal + approval flow
+- Persistent pending patch store
+- Persistent write revocation
+- Audit events for propose/approve/deny
+
+### Controlled Command Execution (Sprint A)
+- Allowlisted commands only
+- argv-only invocation
+- shell=False always
+- Forced cwd to workspace
+- Timeout enforcement
+- Output truncation
+- Audited allow + deny events
+
+---
+
+## Explicit Non-Goals
+
+- No background execution
+- No network connectors
+- No self-escalating permissions
+- No autonomy
+- No full-file overwrite writes
+- No unrestricted subprocess usage
+
+---
+
+## Workspace Model
+
+All filesystem access is restricted to:
+
+WORKSPACE_ROOT (configurable via environment variable)
+
+Any path outside this boundary is denied.
+
+---
+
+## Audit Model
+
+Audit log is append-only JSONL at:
+
+.audit/audit.jsonl
+
+Every tool invocation records:
+- action
+- allow/deny
+- timestamp
+- structured metadata
+
+Audit is mandatory. Silent execution is forbidden.
+
+---
+
+# Explicit Non-Goals (Current Phase)
+
+- No background execution
+- No network connectors
+- No self-escalating permissions
+- No autonomy
+- No unrestricted subprocess usage
+- No full-file overwrite writes
+
+
+---
+
+## Development Status
+
+See:
+- docs/anchors/system-state-v1.md
+- docs/anchors/architecture-contract.md
+- docs/anchors/sprint-history.md
+- SECURITY.md
+
+---
+
+## Running
 
 ```bash
-python main.py "summarize docs"
+python main.py "find and summarize: term"
