@@ -161,5 +161,58 @@ See:
 
 ## Running
 
+Start the agent from the repository root:
+
 ```bash
-python main.py "find and summarize: term"
+python main.py
+```
+
+### Example interactions
+
+Read a file:
+```bash
+read workspace/example.txt
+```
+
+Search files:
+```bash
+search TODO
+```
+
+Propose a write:
+```bash
+propose write workspace/example.txt
+```
+
+Approve a pending write:
+```bash
+approve <patch_id>
+```
+
+Revoke writes:
+```bash
+revoke writes
+```
+
+Run an allowlisted command:
+```bash
+cmd.run ["git", "status"]
+cmd.run ["python", "-m", "pytest"]
+```
+
+Commands outside the allowlist (e.g., `git push`, `bash`, etc.) will be denied and audited.
+
+---
+
+## CMD_RUN Safety Model
+
+The `CMD_RUN` tool:
+
+- Accepts only `argv: list[str]` (no shell passthrough)
+- Executes with `shell=False`
+- Forces `cwd` to the workspace root
+- Enforces a timeout (default 10 seconds)
+- Truncates output to 64KB
+- Audits both allowed and denied executions
+
+All policy checks occur before execution through the ToolGateway.
