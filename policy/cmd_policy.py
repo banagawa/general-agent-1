@@ -25,10 +25,11 @@ CMD_ALLOWLIST: dict[str, dict] = {
 
 # Things we never want in argv (defense-in-depth even though shell=False later)
 DISALLOWED_TOKENS = {
-    ";", "&&", "||", "|", ">", ">>", "<", "<<",
-    "`", "$(", "${", ")",  # keep conservative; we only accept argv anyway
+    "&&", "||", "|", ">", ">>", "<", "<<",
+    "`", "$(", "${",
 }
 
+DISALLOWED_FOR_NON_PYTHON = {";"}
 
 @dataclass(frozen=True)
 class CmdDecision:
@@ -37,8 +38,11 @@ class CmdDecision:
 
 
 def _has_disallowed_tokens(argv: Sequence[str]) -> bool:
+    cmd = argv[0].strip().lower() if argv else ""
     for a in argv:
         if any(tok in a for tok in DISALLOWED_TOKENS):
+            return True
+        if cmd != "python" and any(tok in a for tok in DISALLOWED_FOR_NON_PYTHON):
             return True
     return False
 
