@@ -4,6 +4,10 @@ from policy.engine import PolicyEngine
 from tools.fs_tools import FileSystemTools
 from audit.log import log_event
 from policy.revocations import writes_revoked
+from policy.cmd_policy import validate_cmd_run
+from tools.cmd_tools import run_cmd
+from typing import Sequence, Dict, Any
+
 class ToolGateway:
     def __init__(self):
         self.policy = PolicyEngine()
@@ -43,3 +47,23 @@ class ToolGateway:
         diff = self.fs.apply_patch(path, new_content)
         log_event("ALLOW_WRITE", str(path))
         return diff
+
+    def cmd_run(self, argv: list[str], timeout: int = 10) -> dict:
+        decision = validate_cmd_run(argv)
+        argv_list = list(argv)
+        if not decision.allowed:
+            log_event("CMD_RUN_DENIED", {"argv": argv_list, "reason": decision.reason})
+            return {"ok": False, "denied": True, "reason": decision.reason}
+
+        res = run_cmd(argv=argv_list, workspace_root=WORKSPACE_ROOT, timeout=timeout)
+        log_event("CMD_RUN_EXECUTED", {
+            "argv": argv_list,
+            "cwd": str(WORKSPACE_ROOT),
+            "timeout": timeout,
+            "exit_code": res.get("exit_code"),
+            "duration_ms": res.get("duration_ms"),
+            "stdout_truncated": res.get("stdout_truncated"),
+            "stderr_truncated": res.get("stderr_truncated"),
+            "timed_out": res.get("timed_out"),
+        })
+        return res
