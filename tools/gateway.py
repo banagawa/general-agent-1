@@ -16,9 +16,12 @@ class ToolGateway:
         self.fs = FileSystemTools()
 
     def search_files(self, query: str):
+        ws_root = get_workspace_root()
         log_event("FS_SEARCH", query)
-        return self.fs.search(WORKSPACE_ROOT, query)
-        allowed = []
+
+        results = self.fs.search(ws_root, query)
+
+        allowed: List[Path] = []
         for path in results:
             if self.policy.is_allowed("FS_READ", path):
                 allowed.append(path)
@@ -57,11 +60,13 @@ class ToolGateway:
             log_event("CMD_RUN_DENIED", {"argv": argv_list, "reason": decision.reason})
             return {"ok": False, "denied": True, "reason": decision.reason}
 
-        res = run_cmd(argv=argv_list, workspace_root= get_workspace_root(), timeout=int(timeout_seconds))
+        ws_root = get_workspace_root()
+        res = run_cmd(argv=argv_list, workspace_root=ws_root, timeout=int(timeout_seconds))
+
         log_event("CMD_RUN_EXECUTED", {
             "argv": argv_list,
-            "cwd": str(get_workspace_root),
-            "timeout": timeout_seconds,
+            "cwd": str(ws_root),
+            "timeout": int(timeout_seconds),
             "exit_code": res.get("exit_code"),
             "duration_ms": res.get("duration_ms"),
             "stdout_truncated": res.get("stdout_truncated"),
