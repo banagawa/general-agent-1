@@ -5,10 +5,12 @@ from sandbox.mounts import get_workspace_root
 from policy.engine import PolicyEngine
 from tools.fs_tools import FileSystemTools
 from audit.log import log_event
-from policy.revocations import writes_revoked
 from policy.cmd_policy import validate_cmd_run
 from tools.cmd_tools import run_cmd
 from typing import Sequence, Dict, Any, Optional, List
+
+from policy.capabilities import validate_token
+
 
 class ToolGateway:
     def __init__(self):
@@ -17,7 +19,7 @@ class ToolGateway:
 
     def search_files(self, query: str):
         ws_root = get_workspace_root()
-        log_event("FS_SEARCH", query)
+        log_event("FS_SEARCH", {"query": query})
 
         results = self.fs.search(ws_root, query)
 
@@ -26,38 +28,85 @@ class ToolGateway:
             if self.policy.is_allowed("FS_READ", path):
                 allowed.append(path)
             else:
-                log_event("DENY_SEARCH_RESULT", str(path))
+                log_event("DENY_SEARCH_RESULT", {"path": str(path)})
 
         return allowed
 
     def read_abs_path(self, path: Path):
         # Enforce policy for reads
         if not self.policy.is_allowed("FS_READ", path):
-            log_event("DENY_READ", str(path))
+            log_event("DENY_READ", {"path": str(path)})
             raise PermissionError(f"Access denied: {path}")
 
-        log_event("ALLOW_READ", str(path))
+        log_event("ALLOW_READ", {"path": str(path)})
         return self.fs.read(path)
 
-    def write_file(self, path: Path, new_content: str):
+    def write_file(self, path: Path, new_content: str, cap_token_id: Optional[str] = None):
+        # Capability enforcement MUST happen at the ToolGateway boundary (fail closed).
+        vr = validate_token(
+            token_id=cap_token_id,
+            action="FS_WRITE_PATCH",
+            context={"path": str(path)},
+        )
+        if not vr.allowed:
+            log_event("DENY_WRITE", {
+                "path": str(path),
+                "token_id": vr.token_id,
+                "decision": "deny",
+                "reason": vr.reason,
+            })
+            raise PermissionError(f"Write denied: {vr.reason}")
 
-        if writes_revoked():
-            log_event("DENY_WRITE", f"{path} reason=revoked")
-            raise PermissionError("Write denied: writes are revoked")
-
+        # Policy still applies (system allowlist/constraints)
         if not self.policy.is_allowed("FS_WRITE_PATCH", path):
-            log_event("DENY_WRITE", str(path))
+            log_event("DENY_WRITE", {
+                "path": str(path),
+                "token_id": vr.token_id,
+                "decision": "deny",
+                "reason": "policy",
+            })
             raise PermissionError(f"Write denied: {path}")
 
         diff = self.fs.apply_patch(path, new_content)
-        log_event("ALLOW_WRITE", str(path))
+        log_event("ALLOW_WRITE", {
+            "path": str(path),
+            "token_id": vr.token_id,
+            "decision": "allow",
+        })
         return diff
 
-    def cmd_run(self, argv: Sequence[str], timeout_seconds: int = 10) -> Dict[str, Any]:
-        decision = validate_cmd_run(argv)
+    def cmd_run(
+        self,
+        argv: Sequence[str],
+        timeout_seconds: int = 10,
+        cap_token_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         argv_list = list(argv)
+
+        # Capability enforcement (fail closed). Capability-model plans include CMD_RUN.
+        vr = validate_token(
+            token_id=cap_token_id,
+            action="CMD_RUN",
+            context={"argv": argv_list},
+        )
+        if not vr.allowed:
+            log_event("CMD_RUN_DENIED", {
+                "argv": argv_list,
+                "token_id": vr.token_id,
+                "decision": "deny",
+                "reason": vr.reason,
+            })
+            return {"ok": False, "denied": True, "reason": vr.reason}
+
+        # Existing Sprint A policy enforcement stays intact
+        decision = validate_cmd_run(argv)
         if not decision.allowed:
-            log_event("CMD_RUN_DENIED", {"argv": argv_list, "reason": decision.reason})
+            log_event("CMD_RUN_DENIED", {
+                "argv": argv_list,
+                "token_id": vr.token_id,
+                "decision": "deny",
+                "reason": decision.reason,
+            })
             return {"ok": False, "denied": True, "reason": decision.reason}
 
         ws_root = get_workspace_root()
@@ -72,5 +121,7 @@ class ToolGateway:
             "stdout_truncated": res.get("stdout_truncated"),
             "stderr_truncated": res.get("stderr_truncated"),
             "timed_out": res.get("timed_out"),
+            "token_id": vr.token_id,
+            "decision": "allow",
         })
         return {"ok": True, **res}
