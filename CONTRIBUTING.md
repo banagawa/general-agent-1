@@ -69,3 +69,26 @@ Before committing:
 git status
 git diff
 git diff --staged
+```
+**Hard rules:**
+
+- Do not commit `.audit/`, `workspace/`, `__pycache__/`, `.env`, or local temp files.
+- Keep commits small and single-purpose.
+- If you change policy, gateway routing, audit logging, or execution behavior — you must add or update tests.
+- Do not bypass `ToolGateway` for execution or file access.
+
+---
+
+### 7. Run Tests Locally
+
+Before pushing:
+
+```bash
+python -m pytest -q
+```
+If you modify command execution or subprocess behavior, also verify:
+
+```bash
+grep -RIn "shell=True" agent_core tools policy audit tests
+grep -RIn "subprocess\\.|os\\.system\\(|Popen\\(" agent_core tools policy audit tests
+```
