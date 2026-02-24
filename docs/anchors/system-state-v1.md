@@ -2,7 +2,7 @@
 
 This document defines the current canonical system state as of:
 
-Commit: 883b3da  
+Commit: dbf73b362e0ee8f7a2334387242b319c3151063a
 Branch: main  
 
 ---
@@ -35,7 +35,7 @@ Branch: main
 
 ---
 
-## Sprint A (In Progress)
+## Sprint A (Merged)
 
 CMD_RUN:
 
@@ -66,7 +66,7 @@ CMD_RUN:
 FS_READ  
 FS_SEARCH  
 FS_WRITE_PATCH  
-CMD_RUN (Sprint A branch)
+CMD_RUN
 
 ---
 
