@@ -1,9 +1,4 @@
 
----
-
-# 3️⃣ `SECURITY.md`
-
-```md
 # Security Model
 
 This document defines the threat model and enforcement guarantees of General Agent.
