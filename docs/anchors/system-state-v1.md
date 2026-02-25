@@ -47,6 +47,15 @@ CMD_RUN:
 - Structured return object
 - Audit allow + deny events
 
+--- 
+## Sprint A5 (Merged)
+Capability Tokens:
+- Capability token enforcement at ToolGateway (fail-closed)
+- Token expiry enforcement
+- Token revocation enforcement
+Audit:
+- Backward-compatible audit schema (event/meta + action/.../detail)
+
 ---
 
 ## Explicitly NOT Implemented

@@ -35,8 +35,15 @@ Persistent patch approval + write revocation
 Branch: sprint-a-cmd-run  
 Goal: Allowlisted command execution via ToolGateway
 
+--- 
+## Sprint A5
+
+Branch: sprint-a5-capability-tokens
+Goal: Capability tokens + expiry + revoke-by-token + audit compatibility
+Commits: 02ddee6, cdcd8c6
+
 ---
 
 ## Upcoming
 
-Sprint B: Capability tokens + expiry + revoke-by-token + tests
+Sprint B — Transactional Execution Engine
