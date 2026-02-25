@@ -42,6 +42,5 @@ Add capability tokens to enforce fine-grained, revocable, time-bounded permissio
 - Ensure audit log events are emitted for each deny case.
 
 ## Merge Record (fill on merge)
-- PR: <link>
-- Merge commit: <sha>
-- Date: YYYY-MM-DD
+- Merge commit: 082c013
+- Date: 2026-2-25
