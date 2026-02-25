@@ -1,13 +1,14 @@
 from tools.gateway import ToolGateway
-from sandbox.mounts import WORKSPACE_ROOT, get_workspace_root
+from sandbox.mounts import WORKSPACE_ROOT
 from agent_core.patches import new_patch, PatchProposal
-from policy.revocations import writes_revoked
 from audit.log import log_event
 from agent_core.pending_store import load_pending, save_pending
+from policy.capabilities import issue_token, revoke_token, revoke_all_tokens
 import ast
 
+
 class AgentLoop:
-    def __init__(self,gateway):
+    def __init__(self, gateway):
         self.gateway = gateway
         self.pending: dict[str, PatchProposal] = {}
         self.pending = load_pending()
@@ -24,7 +25,6 @@ class AgentLoop:
 
             out = [f"Top matches for '{query}':"]
             for p in paths[:3]:
-                # p is a Path from fs_tools.search
                 content = self.gateway.read_abs_path(p)
                 snippet = content[:400].replace("\n", " ")
                 relative = p.relative_to(WORKSPACE_ROOT)
@@ -46,8 +46,15 @@ class AgentLoop:
             new_content = parts[2].strip()
             full_path = (WORKSPACE_ROOT / rel_path).resolve()
 
+            # Issue a short-lived capability token scoped to this exact path.
+            tok = issue_token(
+                actions=["FS_WRITE_PATCH"],
+                scope={"path": str(full_path)},
+                ttl_seconds=300,
+            )
+
             try:
-                diff = self.gateway.write_file(full_path, new_content)
+                diff = self.gateway.write_file(full_path, new_content, cap_token_id=tok.id)
                 return f"Patch applied:\n{diff}"
             except Exception as e:
                 return str(e)
@@ -61,19 +68,13 @@ class AgentLoop:
             rel_path = parts[1].strip()
             new_content = parts[2]
 
-            # normalize to workspace path
             full_path = (WORKSPACE_ROOT / rel_path).resolve()
 
             # policy check (write intent), but DO NOT write
-            if writes_revoked:
-                log_event("DENY_PROPOSE", f"{rel_path} reason=revoked")
-                return "Denied: writes are revoked"
-
             if not self.gateway.policy.is_allowed("FS_WRITE_PATCH", full_path):
-                log_event("DENY_PROPOSE", f"{rel_path} reason=policy")
+                log_event("DENY_PROPOSE", {"path": rel_path, "reason": "policy"})
                 return f"Denied: not allowed to write {rel_path}"
 
-            # Generate diff preview without applying:
             original = self.gateway.fs.read(full_path)
             diff = self.gateway.fs.preview_diff(original, new_content)
 
@@ -81,52 +82,61 @@ class AgentLoop:
             self.pending[proposal.patch_id] = proposal
             save_pending(self.pending)
 
-            log_event("PROPOSE_PATCH", f"id={proposal.patch_id} path={rel_path}")
+            log_event("PROPOSE_PATCH", {"patch_id": proposal.patch_id, "path": rel_path})
             return f"PATCH_ID={proposal.patch_id}\n\n{diff}"
 
-
         if task.lower().startswith("approve patch:"):
-            if writes_revoked():
-                log_event("DENY_APPROVE", f"id={patch_id} reason=revoked")
-                return "Denied: writes are revoked"
             patch_id = task.split(":", 1)[1].strip()
-        
+
             proposal = self.pending.get(patch_id)
             if not proposal:
                 return f"Unknown PATCH_ID: {patch_id}"
-        
+
             full_path = (WORKSPACE_ROOT / proposal.rel_path).resolve()
-        
+
+            # Issue a short-lived capability token scoped to this exact file.
+            tok = issue_token(
+                actions=["FS_WRITE_PATCH"],
+                scope={"path": str(full_path)},
+                ttl_seconds=300,
+            )
+
             try:
-                diff = self.gateway.write_file(full_path, proposal.new_content)
-                log_event("APPROVE_PATCH", f"id={patch_id} path={proposal.rel_path}")
+                diff = self.gateway.write_file(full_path, proposal.new_content, cap_token_id=tok.id)
+                log_event("APPROVE_PATCH", {"patch_id": patch_id, "path": proposal.rel_path, "token_id": tok.id})
                 del self.pending[patch_id]
                 save_pending(self.pending)
                 return f"Patch applied.\n\n{diff}"
             except Exception as e:
-                log_event("DENY_APPROVE", f"id={patch_id} err={e}")
+                log_event("DENY_APPROVE", {"patch_id": patch_id, "error": str(e), "token_id": tok.id})
                 return str(e)
-        
+
+        # Replacement for global "revoke writes" (no global flag allowed in A5).
         if task.lower().strip() == "revoke writes":
-            writes_revoked()
-            log_event("REVOKE_WRITES", "writes_revoked=true")
-            return "Writes revoked."
-        
+            revoke_all_tokens()
+            log_event("REVOKE_TOKENS", {"mode": "all"})
+            return "All capability tokens revoked (cleared)."
+
+        if task.lower().startswith("revoke token:"):
+            token_id = task.split(":", 1)[1].strip()
+            revoke_token(token_id)
+            log_event("REVOKE_TOKENS", {"mode": "single", "token_id": token_id})
+            return f"Token revoked: {token_id}"
+
         if task.lower().startswith("cmd.run:"):
-        
             raw = task.split(":", 1)[1].strip()
-        
+
             try:
                 argv = ast.literal_eval(raw)
             except Exception:
                 return "Usage: cmd.run: ['python','--version']"
-        
-            result = self.gateway.cmd_run(argv)
+
+            tok = issue_token(actions=["CMD_RUN"], scope={}, ttl_seconds=120)
+            result = self.gateway.cmd_run(argv, cap_token_id=tok.id)
             return str(result)
-        
+
         if task.lower().startswith("cmd.run"):
             # Expect: cmd.run ["python","--version"]
-        
             try:
                 start = task.index("[")
                 end = task.rindex("]") + 1
@@ -134,11 +144,12 @@ class AgentLoop:
                 argv = ast.literal_eval(argv_literal)
             except Exception:
                 return "Usage: cmd.run [\"python\",\"--version\"]"
-        
+
             try:
-                result = self.gateway.cmd_run(argv)
+                tok = issue_token(actions=["CMD_RUN"], scope={}, ttl_seconds=120)
+                result = self.gateway.cmd_run(argv, cap_token_id=tok.id)
                 return str(result)
             except Exception as e:
                 return str(e)
-        
+
         return f"[STUB] Agent received task: {task}"

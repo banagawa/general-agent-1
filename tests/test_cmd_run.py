@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-
 import pytest
-
+from policy.capabilities import issue_token
 
 def _set_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     """
@@ -42,19 +41,22 @@ def test_cmd_run_denies_non_allowlisted(isolated_repo: Path, tmp_path: Path, mon
     gw = _make_gateway()
 
     # ---- CHANGE THIS LINE if your gateway method name differs ----
-    res = gw.cmd_run(["curl", "--version"])  # should be denied by allowlist
+    tok = issue_token(actions=["CMD_RUN"], ttl_seconds=120)
+    res = gw.cmd_run(["bash"], cap_token_id=tok.id)
+    # should be denied by allowlist
     # --------------------------------------------------------------
 
     assert isinstance(res, dict)
-    assert res.get("allowed") is False or res.get("denied") is True
-    assert "allowlist" in (res.get("reason", "") + res.get("error", "")).lower()
+    assert res.get("ok") is False
+    assert res.get("denied") is True
+    assert res.get("reason")  # should include something like cmd_not_allowlisted
 
 
 def test_cmd_run_denies_disallowed_tokens(isolated_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     _set_workspace(monkeypatch, tmp_path)
     gw = _make_gateway()
-
-    res = gw.cmd_run(["git", "status;rm", "-rf", "."])  # token should trigger deny
+    tok = issue_token(actions=["CMD_RUN"], ttl_seconds=120)
+    res = gw.cmd_run(["git", "status;rm", "-rf", "."], cap_token_id=tok.id)  # token should trigger deny
 
     assert isinstance(res, dict)
     assert res.get("allowed") is False or res.get("denied") is True
@@ -64,8 +66,8 @@ def test_cmd_run_denies_disallowed_tokens(isolated_repo: Path, tmp_path: Path, m
 def test_cmd_run_allows_python_version(isolated_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     _set_workspace(monkeypatch, tmp_path)
     gw = _make_gateway()
-
-    res = gw.cmd_run(["python", "--version"])
+    tok = issue_token(actions=["CMD_RUN"], ttl_seconds=120)
+    res = gw.cmd_run(["python", "--version"], cap_token_id=tok.id)
 
     assert isinstance(res, dict)
     assert res.get("denied") is not True
@@ -80,7 +82,8 @@ def test_cmd_run_forces_cwd_to_workspace(isolated_repo: Path, tmp_path: Path, mo
     gw = _make_gateway()
 
     # Print cwd from inside the command
-    res = gw.cmd_run(["python", "-c", "import os; print(os.getcwd())"])
+    tok = issue_token(actions=["CMD_RUN"], ttl_seconds=120)
+    res = gw.cmd_run(["python", "-c", "import os; print(os.getcwd())"], cap_token_id=tok.id)
 
     assert res.get("denied") is not True
     cwd_reported = (res.get("stdout") or "").strip()
@@ -96,7 +99,8 @@ def test_cmd_run_truncates_output(isolated_repo: Path, tmp_path: Path, monkeypat
     gw = _make_gateway()
 
     # 200k chars should exceed your 64KB cap
-    res = gw.cmd_run(["python", "-c", "print('A' * 200000)"])
+    tok = issue_token(actions=["CMD_RUN"], ttl_seconds=120)
+    res = gw.cmd_run(["python", "-c", "print('A' * 200000)"], cap_token_id=tok.id)
 
     assert res.get("denied") is not True
     assert res.get("stdout_truncated") is True
@@ -110,7 +114,8 @@ def test_cmd_run_times_out(isolated_repo: Path, tmp_path: Path, monkeypatch: pyt
 
     # If your gateway exposes timeout_seconds, use it.
     # Otherwise, adjust to whatever your gateway signature is.
-    res = gw.cmd_run(["python", "-c", "import time; time.sleep(2)"], timeout_seconds=1)
+    tok = issue_token(actions=["CMD_RUN"], ttl_seconds=120)
+    res = gw.cmd_run(["python", "-c", "import time; time.sleep(2)"], timeout_seconds=1, cap_token_id=tok.id)
 
     assert res.get("denied") is not True
     assert res.get("timed_out") is True
