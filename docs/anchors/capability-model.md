@@ -1,4 +1,4 @@
-# Capability Token Model (Planned Sprint B)
+# Capability Token Model (Planned Sprint B:historical/superseded by Sprint A5 implementation)
 
 This document defines the transition from global write revocation to tokenized capability enforcement.
 

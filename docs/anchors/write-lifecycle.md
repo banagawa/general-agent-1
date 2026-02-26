@@ -39,13 +39,35 @@ Audit: PATCH_APPROVED
 
 ---
 
-## Revoke
+## Revoke (Sprint A5+ — Token-Based)
 
-- Persistent revocation store.
-- Blocks propose and approve.
-- Survives CLI restarts.
+Revocation is capability-token based. The system no longer uses a global
+“writes disabled” flag.
 
-Audit: WRITE_REVOKED
+`revoke writes`:
+
+- Clears all active capability tokens (persisted on disk).
+- Emits a `REVOKE_TOKENS` audit event.
+
+After revocation:
+
+- Previously issued tokens are invalid.
+- Any protected operation with a revoked/missing/expired token
+  will deny and audit.
+- Token validation is fail-closed at ToolGateway before execution.
+
+Important:
+
+Revocation does **not** globally disable propose/approve.
+It invalidates existing capabilities. New operations require newly issued,
+valid tokens.
+
+Core invariants preserved:
+
+- Deny-by-default
+- ToolGateway choke point
+- Append-only audit
+- Fail-closed execution
 
 ---
 
