@@ -60,8 +60,6 @@ Audit:
 
 ## Explicitly NOT Implemented
 
-- Capability tokens
-- Token expiry enforcement
 - UX layer
 - Connectors
 - Autonomy
