@@ -44,6 +44,12 @@ Commits: 02ddee6, cdcd8c6
 
 ---
 
+## Sprint B 
+
+Branch: sprint-b-transactional-execution-engine
+Goal: Execution-phase transaction framing via ToolGateway + additive audit lifecycle events  
+Scope Refinement: No filesystem snapshot, no restore engine, no new subsystems
+
 ## Upcoming
 
-Sprint B — Transactional Execution Engine
+Sprint C
