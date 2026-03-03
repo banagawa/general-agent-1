@@ -80,6 +80,21 @@ Security Guarantees Preserved:
 - Audit remains append-only
 ---
 
+### Sprint C — Repo Kernel (In Progress)
+
+Scope:
+- Introduce GIT_RUN tool behind ToolGateway
+- Strict subcommand allowlist: init, status, diff, add, commit, log
+- Deny unknown flags and git config overrides
+- No remote/branch/network operations
+- Token-gated mutating commands
+- Full audit coverage (allow + deny)
+- Workspace boundary enforced
+
+Status: In progress
+
+---
+
 ## Explicitly NOT Implemented
 
 - UX layer
@@ -92,10 +107,11 @@ Security Guarantees Preserved:
 
 ## Tool Inventory
 
-FS_READ  
-FS_SEARCH  
-FS_WRITE_PATCH  
-CMD_RUN
+- FS_READ
+- FS_WRITE (token-gated)
+- FS_SEARCH
+- CMD_RUN (token-gated)
+- GIT_RUN (token-gated for mutations)
 
 ---
 

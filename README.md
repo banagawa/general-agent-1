@@ -196,8 +196,12 @@ revoke writes
 
 Run an allowlisted command:
 ```bash
-cmd.run ["git", "status"]
-cmd.run ["python", "-m", "pytest"]
+{
+  "tool": "git.run",
+  "args": {
+    "argv": ["status"]
+  }
+}
 ```
 
 Commands outside the allowlist (e.g., `git push`, `bash`, etc.) will be denied and audited.
@@ -216,3 +220,16 @@ The `CMD_RUN` tool:
 - Audits both allowed and denied executions
 
 All policy checks occur before execution through the ToolGateway.
+
+## GIT_RUN Safety Model
+
+GIT_RUN is a dedicated repository tool behind ToolGateway.
+
+Constraints:
+- Allowlisted subcommands only: init, status, diff, add, commit, log
+- Deny-by-default (unknown subcommands/flags rejected)
+- No network, remotes, or branch operations
+- Forced workspace cwd (no -C, --git-dir, --work-tree)
+- shell=False execution only
+- Mutating commands (init, add, commit) require capability token
+- All executions (allow + deny) are audited
