@@ -1,7 +1,11 @@
-# Sprint B — Execution Transaction Framing
+# Sprint B — Execution Transaction Framing (Complete)
 
-Status: Planned  
+Status: Complete (merged to main)
 Classification: Enforcement Extension (No New Subsystems)
+
+Branch: sprint-b-impl  
+Merge Commit: <fill after merge>  
+Date Closed: 2026-03-03
 
 This sprint introduces execution-phase transaction framing within ToolGateway.
 

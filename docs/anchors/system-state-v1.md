@@ -58,6 +58,28 @@ Audit:
 
 ---
 
+## Sprint B (Merged)
+
+Execution Transaction Framing:
+
+- Logical transaction wrapper inside ToolGateway
+- TRANSACTION_START / TRANSACTION_COMMIT / TRANSACTION_ROLLBACK events
+- Deterministic tx_id correlation
+- duration_ms recorded for commit/rollback
+- Rollback on:
+  - Policy denial
+  - Capability denial
+  - Timeout
+  - Unexpected exception
+
+Security Guarantees Preserved:
+- ToolGateway remains enforcement choke point
+- No new subsystems introduced
+- No filesystem snapshot/restore
+- Fail-closed behavior preserved
+- Audit remains append-only
+---
+
 ## Explicitly NOT Implemented
 
 - UX layer
