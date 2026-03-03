@@ -129,3 +129,66 @@ class ToolGateway:
             "decision": "allow",
         })
         return {"ok": True, **res}
+        
+    def git_run(
+        self,
+        argv: Sequence[str],
+        timeout_seconds: int = 10,
+        cap_token_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        argv_list = list(argv)
+
+        # classify mutating vs read-only (Sprint C)
+        sub = ""
+        if len(argv_list) >= 2 and isinstance(argv_list[1], str):
+            sub = argv_list[1].strip().lower()
+
+        is_mutation = sub in {"init", "add", "commit"}
+
+        # Token-gate ONLY mutations (read-only allowed without token)
+        vr = None
+        if is_mutation:
+            vr = validate_token(
+                token_id=cap_token_id,
+                action="GIT_RUN",
+                context={"argv": argv_list},
+            )
+            if not vr.allowed:
+                log_event("GIT_RUN_DENIED", {
+                    "argv": argv_list,
+                    "token_id": getattr(vr, "token_id", None),
+                    "decision": "deny",
+                    "reason": getattr(vr, "reason", "token_denied"),
+                })
+                return {"ok": False, "denied": True, "reason": getattr(vr, "reason", "token_denied")}
+
+        # Policy gate (single enforcement spine)
+        if not self.policy.is_allowed("GIT_RUN", {"argv": argv_list}):
+            reason = "disallowed"
+            if hasattr(self.policy, "explain_denial"):
+                reason = self.policy.explain_denial("GIT_RUN", {"argv": argv_list}) or "disallowed"
+
+            log_event("GIT_RUN_DENIED", {
+                "argv": argv_list,
+                "token_id": getattr(vr, "token_id", None) if vr else None,
+                "decision": "deny",
+                "reason": reason,
+            })
+            return {"ok": False, "denied": True, "reason": reason}
+
+        ws_root = get_workspace_root()
+        res = run_cmd(argv=argv_list, workspace_root=ws_root, timeout=int(timeout_seconds))
+
+        log_event("GIT_RUN_EXECUTED", {
+            "argv": argv_list,
+            "cwd": str(ws_root),
+            "timeout": int(timeout_seconds),
+            "exit_code": res.get("exit_code"),
+            "duration_ms": res.get("duration_ms"),
+            "stdout_truncated": res.get("stdout_truncated"),
+            "stderr_truncated": res.get("stderr_truncated"),
+            "timed_out": res.get("timed_out"),
+            "token_id": getattr(vr, "token_id", None) if vr else None,
+            "decision": "allow",
+        })
+        return {"ok": True, **res}

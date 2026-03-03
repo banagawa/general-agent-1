@@ -52,8 +52,19 @@ Scope Refinement: No filesystem snapshot, no restore engine, no new subsystems
 Commits: 5519e52
 Status: Complete  
 Closed: 2026-03-03
+---
+### Sprint C — Repo Kernel
 
-
+Branch: sprint-c-repo-kernel  
+Goal: Introduce GIT_RUN with strict policy enforcement  
+Scope:
+- Dedicated git tool via ToolGateway
+- Subcommand allowlist
+- Token-gated mutations
+- Deny remote/branch/network ops
+- Full audit coverage
+Status: In progress
+---
 ## Upcoming
 
-Sprint C
+Sprint D

@@ -76,7 +76,7 @@ git diff --staged
 - Keep commits small and single-purpose.
 - If you change policy, gateway routing, audit logging, or execution behavior — you must add or update tests.
 - Do not bypass `ToolGateway` for execution or file access.
-
+- If modifying git policy/gateway/audit logic, add explicit deny-case tests.
 ---
 
 ### 7. Run Tests Locally
@@ -92,3 +92,4 @@ If you modify command execution or subprocess behavior, also verify:
 grep -RIn "shell=True" agent_core tools policy audit tests
 grep -RIn "subprocess\\.|os\\.system\\(|Popen\\(" agent_core tools policy audit tests
 ```
+Do not invoke git via subprocess directly. Use GIT_RUN tool surface.

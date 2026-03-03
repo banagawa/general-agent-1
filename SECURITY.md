@@ -75,6 +75,21 @@ Denied commands:
 
 ---
 
+### Git Execution Controls (GIT_RUN)
+
+Git operations are isolated behind a dedicated tool.
+
+Restrictions:
+- Only allowlisted subcommands permitted
+- Unknown flags rejected
+- No config override flags (-c, --git-dir, --work-tree, -C)
+- No remote or branch operations (push, pull, fetch, clone, remote, checkout, switch, branch, merge, rebase, tag, submodule)
+- No network access
+- Workspace-bound execution only
+- Mutating operations require capability token
+- All attempts audited (allow + deny)
+
+---
 ### 5. Audit Guarantees
 
 Every tool invocation logs:
