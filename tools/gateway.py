@@ -5,7 +5,6 @@ from sandbox.mounts import get_workspace_root
 from policy.engine import PolicyEngine
 from tools.fs_tools import FileSystemTools
 from audit.log import log_event
-from policy.cmd_policy import validate_cmd_run
 from tools.cmd_tools import run_cmd
 from typing import Sequence, Dict, Any, Optional, List
 
@@ -74,16 +73,15 @@ class ToolGateway:
             "decision": "allow",
         })
         return diff
-
     def cmd_run(
         self,
         argv: Sequence[str],
         timeout_seconds: int = 10,
         cap_token_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        ) -> Dict[str, Any]:
         argv_list = list(argv)
 
-        # Capability enforcement (fail closed). Capability-model plans include CMD_RUN.
+        # Capability enforcement (fail closed).
         vr = validate_token(
             token_id=cap_token_id,
             action="CMD_RUN",
@@ -98,17 +96,23 @@ class ToolGateway:
             })
             return {"ok": False, "denied": True, "reason": vr.reason}
 
-        # Existing Sprint A policy enforcement stays intact
-        decision = validate_cmd_run(argv)
-        if not decision.allowed:
-            log_event("CMD_RUN_DENIED", {
-                "argv": argv_list,
-                "token_id": vr.token_id,
-                "decision": "deny",
-                "reason": decision.reason,
-            })
-            return {"ok": False, "denied": True, "reason": decision.reason}
+        # Policy enforcement: MUST route through PolicyEngine gate (Architecture Contract).
+        if not self.policy.is_allowed("CMD_RUN", {"argv": argv_list}):
+            reason = "disallowed"
+            if hasattr(self.policy, "explain_denial"):
+                reason = self.policy.explain_denial("CMD_RUN", {"argv": argv_list}) or "disallowed"
 
+            log_event(
+                "CMD_RUN_DENIED",
+                {
+                    "argv": argv_list,
+                    "token_id": vr.token_id,
+                    "decision": "deny",
+                    "reason": reason,
+                },
+            )
+            return {"ok": False, "denied": True, "reason": reason}
+        
         ws_root = get_workspace_root()
         res = run_cmd(argv=argv_list, workspace_root=ws_root, timeout=int(timeout_seconds))
 
