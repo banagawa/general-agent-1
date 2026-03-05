@@ -6,6 +6,9 @@ from agent_core.pending_store import load_pending, save_pending
 from policy.capabilities import issue_token, revoke_token, revoke_all_tokens
 import ast
 
+from agent_core.steps import Step
+from agent_core.execute_step import execute_step
+
 
 class AgentLoop:
     def __init__(self, gateway):
@@ -46,15 +49,20 @@ class AgentLoop:
             new_content = parts[2].strip()
             full_path = (WORKSPACE_ROOT / rel_path).resolve()
 
-            # Issue a short-lived capability token scoped to this exact path.
             tok = issue_token(
                 actions=["FS_WRITE_PATCH"],
                 scope={"path": str(full_path)},
                 ttl_seconds=300,
             )
 
+            step = Step(
+                tool="FS_WRITE_PATCH",
+                args={"path": full_path, "new_content": new_content},
+                cap_token_id=tok.id,
+            )
+
             try:
-                diff = self.gateway.write_file(full_path, new_content, cap_token_id=tok.id)
+                diff = execute_step(self.gateway, step)
                 return f"Patch applied:\n{diff}"
             except Exception as e:
                 return str(e)
@@ -94,16 +102,24 @@ class AgentLoop:
 
             full_path = (WORKSPACE_ROOT / proposal.rel_path).resolve()
 
-            # Issue a short-lived capability token scoped to this exact file.
             tok = issue_token(
                 actions=["FS_WRITE_PATCH"],
                 scope={"path": str(full_path)},
                 ttl_seconds=300,
             )
 
+            step = Step(
+                tool="FS_WRITE_PATCH",
+                args={"path": full_path, "new_content": proposal.new_content},
+                cap_token_id=tok.id,
+            )
+
             try:
-                diff = self.gateway.write_file(full_path, proposal.new_content, cap_token_id=tok.id)
-                log_event("APPROVE_PATCH", {"patch_id": patch_id, "path": proposal.rel_path, "token_id": tok.id})
+                diff = execute_step(self.gateway, step)
+                log_event(
+                    "APPROVE_PATCH",
+                    {"patch_id": patch_id, "path": proposal.rel_path, "token_id": tok.id},
+                )
                 del self.pending[patch_id]
                 save_pending(self.pending)
                 return f"Patch applied.\n\n{diff}"
@@ -132,8 +148,18 @@ class AgentLoop:
                 return "Usage: cmd.run: ['python','--version']"
 
             tok = issue_token(actions=["CMD_RUN"], scope={}, ttl_seconds=120)
-            result = self.gateway.cmd_run(argv, cap_token_id=tok.id)
-            return str(result)
+
+            step = Step(
+                tool="CMD_RUN",
+                args={"argv": argv, "timeout_seconds": 30},
+                cap_token_id=tok.id,
+            )
+
+            try:
+                result = execute_step(self.gateway, step)
+                return str(result)
+            except Exception as e:
+                return str(e)
 
         if task.lower().startswith("cmd.run"):
             # Expect: cmd.run ["python","--version"]
@@ -145,9 +171,16 @@ class AgentLoop:
             except Exception:
                 return "Usage: cmd.run [\"python\",\"--version\"]"
 
+            tok = issue_token(actions=["CMD_RUN"], scope={}, ttl_seconds=120)
+
+            step = Step(
+                tool="CMD_RUN",
+                args={"argv": argv, "timeout_seconds": 30},
+                cap_token_id=tok.id,
+            )
+
             try:
-                tok = issue_token(actions=["CMD_RUN"], scope={}, ttl_seconds=120)
-                result = self.gateway.cmd_run(argv, cap_token_id=tok.id)
+                result = execute_step(self.gateway, step)
                 return str(result)
             except Exception as e:
                 return str(e)

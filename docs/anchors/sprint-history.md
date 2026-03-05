@@ -65,6 +65,22 @@ Scope:
 - Full audit coverage
 Status: In progress
 ---
+
 ## Upcoming
 
-Sprint D
+### Sprint D — Structured Plan Artifact
+
+Branch: sprint-d-structured-plan-artifact
+Goal: Deterministic PLAN schema + approval gate (no tool execution until plan approval)
+Scope:
+- Deterministic plan schema
+- Ordered tool steps (parsed args)
+- Capability scope per step
+- Plan hash logged in audit
+- Fail-closed on schema violation
+Status: In progess
+
+---
+## Upcoming
+
+Sprint E
