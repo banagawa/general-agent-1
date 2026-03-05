@@ -80,7 +80,7 @@ Security Guarantees Preserved:
 - Audit remains append-only
 ---
 
-### Sprint C — Repo Kernel (In Progress)
+### Sprint C — Repo Kernel (Complete)
 
 Scope:
 - Introduce GIT_RUN tool behind ToolGateway
@@ -90,6 +90,20 @@ Scope:
 - Token-gated mutating commands
 - Full audit coverage (allow + deny)
 - Workspace boundary enforced
+
+Status: Complete
+
+---
+
+### Sprint D — Structured Plan Artifact (Planned)
+
+Scope:
+- Deterministic PLAN schema
+- Ordered tool steps with parsed arguments
+- Capability scope per step
+- No execution until plan approval
+- Plan hash logged in audit
+- Fail closed on schema violation
 
 Status: In progress
 

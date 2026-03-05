@@ -98,6 +98,14 @@ If this invariant is broken, the system’s security model is compromised.
 - Output truncation
 - Audited allow + deny events
 
+### Structured Planning (Sprint D — Planned)
+
+A deterministic PLAN artifact will be required before any tool execution:
+- Ordered steps with parsed args
+- Capability scope per step
+- Explicit approval gate (no execution until approved)
+- Plan hash logged in audit
+
 ---
 
 ## Explicit Non-Goals

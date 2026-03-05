@@ -101,6 +101,15 @@ Every tool invocation logs:
 
 Audit log is append-only.
 
+
+### 6. Structured Plan Gating (Planned)
+
+Planned enforcement:
+- No free-form execution
+- Tool execution only from an approved deterministic PLAN
+- Plan schema violations deny + audit
+- Plan hash recorded in audit for traceability
+
 ---
 
 ## Fail-Closed Guarantee

@@ -1,0 +1,93 @@
+# Sprint D — Structured Plan Artifact
+
+Status: In progress
+Classification: Enforcement Extension (No Free-Form Execution)
+
+Branch: sprint-d-structured-plan-artifact
+Merge Commit: <fill after merge>
+Date Closed: <fill on close>
+
+This sprint introduces a deterministic PLAN artifact that must be approved before any tool execution.
+
+---
+
+## Objective
+
+Replace manual step sequencing with a structured, reviewable plan.
+
+Deliverables:
+- Deterministic PLAN schema
+- Ordered tool steps with parsed arguments
+- Capability scope per step
+- No execution until plan approval
+- Plan hash logged in audit
+- Fail closed on schema violation
+
+---
+
+## Architectural Alignment
+
+Preserves the core enforcement spine:
+Orchestrator → AgentLoop → ToolGateway → PolicyEngine → Tool Implementation
+
+No tool is invoked directly from the loop/orchestrator.
+
+---
+
+## PLAN Requirements (Deterministic)
+
+PLAN must:
+- Be structured (no free text execution)
+- Use explicit ordered steps (step_id 1..N)
+- For each step:
+  - tool name
+  - parsed args object
+  - declared capability scope
+- Be validated before any execution attempt
+
+Schema violations must deny + audit.
+
+---
+
+## Approval Gate
+
+Execution requires explicit approval:
+- If plan not approved → deny execution
+- Deny must be auditable
+
+---
+
+## Plan Hash
+
+A stable plan hash must be computed from the validated plan and recorded in audit events:
+- PLAN_CREATED (plan_hash, step_count, ...)
+- PLAN_APPROVED (plan_hash, approver, ...)
+- PLAN_EXECUTION_DENIED (plan_hash, reason, ...)
+- PLAN_EXECUTION_STARTED (plan_hash, ...)
+- PLAN_EXECUTION_FINISHED (plan_hash, status, ...)
+
+Audit is append-only; events additive only.
+
+---
+
+## Security Boundary
+
+- No free-form execution
+- Fail closed on schema violation
+- No bypass of ToolGateway/PolicyEngine
+- Capability enforcement remains fail-closed per invocation
+
+---
+
+## Definition of Done
+
+- Plan schema + validator implemented and deny-by-default
+- Plan hash computed deterministically and logged
+- ToolGateway refuses execution without approved plan
+- Capability scope is declared per step and enforced
+- Tests cover:
+  - schema violation denies
+  - unapproved plan denies
+  - approved plan allows execution path
+  - plan hash stable across runs
+  - audit events emitted for allow + deny
