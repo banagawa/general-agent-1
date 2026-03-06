@@ -3,11 +3,12 @@ from sandbox.mounts import WORKSPACE_ROOT
 from agent_core.patches import new_patch, PatchProposal
 from audit.log import log_event
 from agent_core.pending_store import load_pending, save_pending
-from policy.capabilities import issue_token, revoke_token, revoke_all_tokens
+from policy.capabilities import revoke_token, revoke_all_tokens
 import ast
+import json
 
-from agent_core.steps import Step
-from agent_core.execute_step import execute_step
+from agent_core.plan_schema import Plan, ToolStep
+from agent_core.plan_executor import submit_plan, approve_plan, execute_plan
 
 
 class AgentLoop:
@@ -15,6 +16,24 @@ class AgentLoop:
         self.gateway = gateway
         self.pending: dict[str, PatchProposal] = {}
         self.pending = load_pending()
+
+    def _parse_plan_json(self, raw: str) -> Plan:
+        data = json.loads(raw)
+
+        steps = tuple(
+            ToolStep(
+                step_id=step["step_id"],
+                tool=step["tool"],
+                capability=step["capability"],
+                args=step["args"],
+            )
+            for step in data["steps"]
+        )
+
+        return Plan(
+            plan_id=data["plan_id"],
+            steps=steps,
+        )
 
     def run(self, task: str) -> str:
         task = task.strip()
@@ -40,33 +59,6 @@ class AgentLoop:
             paths = self.gateway.search_files(query)
             return "\n".join(str(p) for p in paths[:20]) if paths else "No matches."
 
-        if task.lower().startswith("update file:"):
-            parts = task.split(":", 2)
-            if len(parts) < 3:
-                return "Usage: update file: <relative_path>: <new content>"
-
-            rel_path = parts[1].strip()
-            new_content = parts[2].strip()
-            full_path = (WORKSPACE_ROOT / rel_path).resolve()
-
-            tok = issue_token(
-                actions=["FS_WRITE_PATCH"],
-                scope={"path": str(full_path)},
-                ttl_seconds=300,
-            )
-
-            step = Step(
-                tool="FS_WRITE_PATCH",
-                args={"path": full_path, "new_content": new_content},
-                cap_token_id=tok.id,
-            )
-
-            try:
-                diff = execute_step(self.gateway, step)
-                return f"Patch applied:\n{diff}"
-            except Exception as e:
-                return str(e)
-
         if task.lower().startswith("propose patch:"):
             parts = task.split(":", 2)
 
@@ -78,7 +70,6 @@ class AgentLoop:
 
             full_path = (WORKSPACE_ROOT / rel_path).resolve()
 
-            # policy check (write intent), but DO NOT write
             if not self.gateway.policy.is_allowed("FS_WRITE_PATCH", full_path):
                 log_event("DENY_PROPOSE", {"path": rel_path, "reason": "policy"})
                 return f"Denied: not allowed to write {rel_path}"
@@ -102,32 +93,16 @@ class AgentLoop:
 
             full_path = (WORKSPACE_ROOT / proposal.rel_path).resolve()
 
-            tok = issue_token(
-                actions=["FS_WRITE_PATCH"],
-                scope={"path": str(full_path)},
-                ttl_seconds=300,
-            )
-
-            step = Step(
-                tool="FS_WRITE_PATCH",
-                args={"path": full_path, "new_content": proposal.new_content},
-                cap_token_id=tok.id,
-            )
-
             try:
-                diff = execute_step(self.gateway, step)
-                log_event(
-                    "APPROVE_PATCH",
-                    {"patch_id": patch_id, "path": proposal.rel_path, "token_id": tok.id},
-                )
+                diff = self.gateway.write_file(full_path, proposal.new_content)
+                log_event("APPROVE_PATCH", {"patch_id": patch_id, "path": proposal.rel_path})
                 del self.pending[patch_id]
                 save_pending(self.pending)
                 return f"Patch applied.\n\n{diff}"
             except Exception as e:
-                log_event("DENY_APPROVE", {"patch_id": patch_id, "error": str(e), "token_id": tok.id})
+                log_event("DENY_APPROVE", {"patch_id": patch_id, "error": str(e)})
                 return str(e)
 
-        # Replacement for global "revoke writes" (no global flag allowed in A5).
         if task.lower().strip() == "revoke writes":
             revoke_all_tokens()
             log_event("REVOKE_TOKENS", {"mode": "all"})
@@ -139,50 +114,45 @@ class AgentLoop:
             log_event("REVOKE_TOKENS", {"mode": "single", "token_id": token_id})
             return f"Token revoked: {token_id}"
 
-        if task.lower().startswith("cmd.run:"):
+        if task.lower().startswith("plan.submit:"):
             raw = task.split(":", 1)[1].strip()
 
             try:
-                argv = ast.literal_eval(raw)
-            except Exception:
-                return "Usage: cmd.run: ['python','--version']"
+                plan = self._parse_plan_json(raw)
+                result = submit_plan(plan)
+                return (
+                    f"PLAN_HASH={result['plan_hash']}\n"
+                    f"STEPS={result['steps']}\n"
+                    f"STATUS={result['status']}"
+                )
+            except Exception as e:
+                return str(e)
 
-            tok = issue_token(actions=["CMD_RUN"], scope={}, ttl_seconds=120)
-
-            step = Step(
-                tool="CMD_RUN",
-                args={"argv": argv, "timeout_seconds": 30},
-                cap_token_id=tok.id,
-            )
+        if task.lower().startswith("plan.approve:"):
+            plan_hash = task.split(":", 1)[1].strip()
 
             try:
-                result = execute_step(self.gateway, step)
+                result = approve_plan(plan_hash)
+                return f"PLAN_APPROVED {result['plan_hash']}"
+            except Exception as e:
+                return str(e)
+
+        if task.lower().startswith("plan.execute:"):
+            plan_hash = task.split(":", 1)[1].strip()
+
+            try:
+                result = execute_plan(self.gateway, plan_hash)
                 return str(result)
             except Exception as e:
                 return str(e)
+
+        if task.lower().startswith("update file:"):
+            return "DENIED: use PLAN"
+
+        if task.lower().startswith("cmd.run:"):
+            return "DENIED: use PLAN"
 
         if task.lower().startswith("cmd.run"):
-            # Expect: cmd.run ["python","--version"]
-            try:
-                start = task.index("[")
-                end = task.rindex("]") + 1
-                argv_literal = task[start:end]
-                argv = ast.literal_eval(argv_literal)
-            except Exception:
-                return "Usage: cmd.run [\"python\",\"--version\"]"
-
-            tok = issue_token(actions=["CMD_RUN"], scope={}, ttl_seconds=120)
-
-            step = Step(
-                tool="CMD_RUN",
-                args={"argv": argv, "timeout_seconds": 30},
-                cap_token_id=tok.id,
-            )
-
-            try:
-                result = execute_step(self.gateway, step)
-                return str(result)
-            except Exception as e:
-                return str(e)
+            return "DENIED: use PLAN"
 
         return f"[STUB] Agent received task: {task}"
