@@ -1,4 +1,4 @@
-from pathlib import Path
+from __future__ import annotations
 
 from sandbox.mounts import get_workspace_root
 
@@ -18,7 +18,6 @@ def execute_step(gateway, step):
     if step.tool == "PATCH_APPLY":
         workspace_root = get_workspace_root()
         path = (workspace_root / step.args["path"]).resolve()
-
         return gateway.patch_apply(
             path=path,
             new_content=step.args["new_content"],

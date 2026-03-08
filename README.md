@@ -1,243 +1,129 @@
-# General Agent — Permissioned Internal Execution System
+# General Agent 1
 
-General Agent is a permission-enforced, workspace-bounded execution system designed for controlled file operations and allowlisted command execution.
+A deterministic, policy-enforced autonomous software agent.
 
-This is **not** an autonomous agent.  
-This is a fail-closed, auditable, policy-driven execution core.
+The system is built around strict architectural invariants:
 
----
+- ToolGateway is the single execution choke point
+- Deny-by-default policy enforcement
+- Workspace boundary isolation
+- Patch-only file writes
+- Append-only audit logging
 
-## Core Principles
-
-- Deny-by-default
-- Workspace-bounded execution
-- Patch-only mutation
-- Explicit approval for writes
-- No shell passthrough
-- Auditable lifecycle
-- Fail-closed enforcement
+Execution is deterministic and policy controlled.
 
 ---
 
-## Architecture Spine
+# Architecture Overview
 
-Orchestrator  
-→ AgentLoop  
-→ ToolGateway  
-→ PolicyEngine  
-→ Tool Implementations  
+Execution pipeline:
 
-All tool calls must pass through ToolGateway.
-
-There are no direct tool invocations.
-
-# Minimal Architecture Diagram
-
-All execution flows through a single enforcement spine.
-
-User/CLI Request
-   |
-   v
-main.py
-   |
-   v
-Orchestrator
-   |
-   v
 AgentLoop
-   |
-   v
-ToolGateway  <--- single choke point for all tools (audit + policy)
-   |
-   +--> PolicyEngine (deny-by-default, workspace boundary, deny patterns)
-   |
-   +--> Tool Implementations
-         - FS tools (search/read)
-         - Patch write tools (propose/approve)
-         - CMD_RUN (allowlisted subprocess, shell=False)
-   |
-   v
-Audit Log (.audit/audit.jsonl)
+ → PlanExecutor
+ → execute_step
+ → ToolGateway
+ → PolicyEngine
+ → Tool
 
+All tools are executed through the ToolGateway which enforces capability tokens and policy checks.
 
 ---
 
-## Critical Invariant
+# Structured Planning (Sprint D — Implemented)
 
-No tool may be invoked directly from the loop or orchestrator.
+All execution now requires a deterministic PLAN artifact.
 
-All actions must pass through:
+Execution flow:
 
-AgentLoop → ToolGateway → PolicyEngine → Tool
+1. Submit a structured plan
+2. Approve the plan
+3. Execute the approved plan
 
-If this invariant is broken, the system’s security model is compromised.
+Commands:
 
----
+Submit plan:
+plan.submit:<json>
 
-## Current Capabilities
+Approve plan:
+plan.approve:<plan_hash>
 
-### Read-Only Operations
-- File search (extension filtered)
-- File read (size capped)
-- Workspace boundary enforcement
-- Persistent audit logging
+Execute plan:
+plan.execute:<plan_hash>
 
-### Controlled Mutation
-- Patch-based writes only
-- Proposal + approval flow
-- Persistent pending patch store
-- Persistent write revocation
-- Audit events for propose/approve/deny
+Example:
 
-### Controlled Command Execution (Sprint A)
-- Allowlisted commands only
-- argv-only invocation
-- shell=False always
-- Forced cwd to workspace
-- Timeout enforcement
-- Output truncation
-- Audited allow + deny events
+plan.submit:{"plan_id":"example","steps":[{"step_id":1,"tool":"TEST_RUN","capability":"test.run","args":{"argv":["python","--version"]}}]}
 
-### Structured Planning (Sprint D — Planned)
-
-A deterministic PLAN artifact will be required before any tool execution:
-- Ordered steps with parsed args
-- Capability scope per step
-- Explicit approval gate (no execution until approved)
-- Plan hash logged in audit
+Response:
+PLAN_HASH=<hash>
+STEPS=1
+STATUS=PENDING_APPROVAL
 
 ---
 
-## Explicit Non-Goals
+# Raw Execution Protection
 
-- No background execution
-- No network connectors
-- No self-escalating permissions
-- No autonomy
-- No full-file overwrite writes
-- No unrestricted subprocess usage
+Direct execution is blocked.
 
----
+Examples:
+cmd.run: echo hello
+update file: file.txt: content
+propose patch: file.txt: content
 
-## Workspace Model
-
-All filesystem access is restricted to:
-
-WORKSPACE_ROOT (configurable via environment variable)
-
-Any path outside this boundary is denied.
+Response:
+DENIED: use PLAN
 
 ---
 
-## Audit Model
+# Capability Model
 
-Audit log is append-only JSONL at:
+Each tool execution requires a capability token.
 
-.audit/audit.jsonl
+Tokens are:
+- short-lived
+- scoped
+- fail-closed
 
-Every tool invocation records:
-- action
-- allow/deny
-- timestamp
-- structured metadata
-
-Audit is mandatory. Silent execution is forbidden.
+Tokens are issued automatically when executing approved plan steps.
 
 ---
 
-# Explicit Non-Goals (Current Phase)
+# Audit Events
 
-- No background execution
-- No network connectors
-- No self-escalating permissions
-- No autonomy
-- No unrestricted subprocess usage
-- No full-file overwrite writes
+PLAN_CREATED
+PLAN_APPROVED
+PLAN_EXECUTION_STARTED
+PLAN_EXECUTION_FINISHED
+PLAN_EXECUTION_DENIED
+PLAN_EXECUTION_FAILED
 
-
----
-
-## Development Status
-
-See:
-- docs/anchors/system-state-v1.md
-- docs/anchors/architecture-contract.md
-- docs/anchors/sprint-history.md
-- SECURITY.md
+Audit logs are append-only.
 
 ---
 
-## Running
+# Development Workflow
 
-Start the agent from the repository root:
+Run agent:
 
-```bash
-python main.py
-```
+python main.py "<task>"
 
-### Example interactions
+Example:
 
-Read a file:
-```bash
-read workspace/example.txt
-```
-
-Search files:
-```bash
-search TODO
-```
-
-Propose a write:
-```bash
-propose write workspace/example.txt
-```
-
-Approve a pending write:
-```bash
-approve <patch_id>
-```
-
-Revoke writes:
-```bash
-revoke writes
-```
-
-Run an allowlisted command:
-```bash
-{
-  "tool": "git.run",
-  "args": {
-    "argv": ["status"]
-  }
-}
-```
-
-Commands outside the allowlist (e.g., `git push`, `bash`, etc.) will be denied and audited.
+python main.py "plan.submit:{...}"
 
 ---
 
-## CMD_RUN Safety Model
+# Project Status
 
-The `CMD_RUN` tool:
+| Sprint | Status |
+|------|------|
+Sprint A | Complete |
+Sprint B | Complete |
+Sprint C | Complete |
+Sprint D | Complete |
 
-- Accepts only `argv: list[str]` (no shell passthrough)
-- Executes with `shell=False`
-- Forces `cwd` to the workspace root
-- Enforces a timeout (default 10 seconds)
-- Truncates output to 64KB
-- Audits both allowed and denied executions
+---
 
-All policy checks occur before execution through the ToolGateway.
+# Next Phase
 
-## GIT_RUN Safety Model
-
-GIT_RUN is a dedicated repository tool behind ToolGateway.
-
-Constraints:
-- Allowlisted subcommands only: init, status, diff, add, commit, log
-- Deny-by-default (unknown subcommands/flags rejected)
-- No network, remotes, or branch operations
-- Forced workspace cwd (no -C, --git-dir, --work-tree)
-- shell=False execution only
-- Mutating commands (init, add, commit) require capability token
-- All executions (allow + deny) are audited
+Sprint E: Deterministic development loops.

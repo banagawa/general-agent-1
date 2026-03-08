@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import json
-from pathlib import Path
 from dataclasses import asdict
+from pathlib import Path
+
+from sandbox.mounts import get_workspace_root
 
 from .plan_schema import Plan, ToolStep
 
 
-PLAN_ROOT = Path("plans")
+PLAN_ROOT = get_workspace_root() / "plans"
 PENDING_DIR = PLAN_ROOT / "pending"
 APPROVED_DIR = PLAN_ROOT / "approved"
 
@@ -30,11 +34,20 @@ def _read_plan(path: Path) -> Plan:
     return _plan_from_dict(data)
 
 
+def _atomic_write_text(path: Path, content: str) -> None:
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(content, encoding="utf-8")
+    tmp_path.replace(path)
+
+
 def _write_plan(path: Path, plan: Plan) -> None:
-    path.write_text(
-        json.dumps(_plan_to_dict(plan), indent=2, ensure_ascii=False),
-        encoding="utf-8",
+    content = json.dumps(
+        _plan_to_dict(plan),
+        indent=2,
+        ensure_ascii=False,
+        sort_keys=True,
     )
+    _atomic_write_text(path, content)
 
 
 def pending_plan_path(plan_hash: str) -> Path:
@@ -71,7 +84,7 @@ def mark_plan_approved(plan_hash: str) -> Plan:
         raise ValueError("pending plan not found")
 
     plan = _read_plan(src)
-    dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    _atomic_write_text(dst, src.read_text(encoding="utf-8"))
     src.unlink()
     return plan
 

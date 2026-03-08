@@ -7,13 +7,62 @@ ALLOWED_TOOLS = {
     "TEST_RUN",
 }
 
+EXPECTED_CAPABILITY_BY_TOOL = {
+    "GIT_RUN": "git.run",
+    "PATCH_APPLY": "patch.apply",
+    "TEST_RUN": "test.run",
+}
+
+
+def _require_non_empty_string(value, field_name: str) -> None:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be non-empty string")
+
+
+def _require_argv(args: dict, tool_name: str) -> None:
+    argv = args.get("argv")
+    if not isinstance(argv, list) or len(argv) == 0:
+        raise ValueError(f"{tool_name} args.argv must be non-empty list")
+    for item in argv:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"{tool_name} args.argv entries must be non-empty strings")
+
+
+def _require_timeout_if_present(args: dict, tool_name: str) -> None:
+    timeout_seconds = args.get("timeout_seconds")
+    if timeout_seconds is not None:
+        if not isinstance(timeout_seconds, int) or timeout_seconds <= 0:
+            raise ValueError(f"{tool_name} timeout_seconds must be positive int")
+
+
+def _validate_git_run(step: ToolStep) -> None:
+    _require_argv(step.args, "GIT_RUN")
+    _require_timeout_if_present(step.args, "GIT_RUN")
+
+
+def _validate_patch_apply(step: ToolStep) -> None:
+    path = step.args.get("path")
+    new_content = step.args.get("new_content")
+
+    _require_non_empty_string(path, "PATCH_APPLY args.path")
+
+    if not isinstance(new_content, str):
+        raise ValueError("PATCH_APPLY args.new_content must be string")
+
+    if "argv" in step.args:
+        raise ValueError("PATCH_APPLY must not include args.argv")
+
+
+def _validate_test_run(step: ToolStep) -> None:
+    _require_argv(step.args, "TEST_RUN")
+    _require_timeout_if_present(step.args, "TEST_RUN")
+
 
 def validate_plan(plan: Plan) -> None:
     if not isinstance(plan, Plan):
         raise ValueError("plan must be Plan")
 
-    if not isinstance(plan.plan_id, str) or not plan.plan_id.strip():
-        raise ValueError("plan_id must be non-empty string")
+    _require_non_empty_string(plan.plan_id, "plan_id")
 
     if not isinstance(plan.steps, tuple):
         raise ValueError("steps must be tuple")
@@ -21,23 +70,24 @@ def validate_plan(plan: Plan) -> None:
     if len(plan.steps) == 0:
         raise ValueError("steps must be non-empty")
 
-    expected = 1
     seen_ids = set()
 
-    for step in plan.steps:
+    for index, step in enumerate(plan.steps, start=1):
         if not isinstance(step, ToolStep):
             raise ValueError("all steps must be ToolStep")
+
+        if not isinstance(step.step_id, int):
+            raise ValueError("step_id must be int")
 
         if step.step_id in seen_ids:
             raise ValueError("duplicate step id")
 
+        if step.step_id != index:
+            raise ValueError("step ids must be sequential starting at 1")
+
         seen_ids.add(step.step_id)
 
-        if step.step_id != expected:
-            raise ValueError("step ids must be sequential")
-
-        if not isinstance(step.tool, str) or not step.tool.strip():
-            raise ValueError("tool must be non-empty string")
+        _require_non_empty_string(step.tool, "tool")
 
         if step.tool not in ALLOWED_TOOLS:
             raise ValueError(f"tool not allowed: {step.tool}")
@@ -45,7 +95,19 @@ def validate_plan(plan: Plan) -> None:
         if not isinstance(step.args, dict):
             raise ValueError("args must be dict")
 
-        if not isinstance(step.capability, str) or not step.capability.strip():
-            raise ValueError("missing capability")
+        _require_non_empty_string(step.capability, "capability")
 
-        expected += 1
+        expected_capability = EXPECTED_CAPABILITY_BY_TOOL[step.tool]
+        if step.capability != expected_capability:
+            raise ValueError(
+                f"capability mismatch for {step.tool}: expected {expected_capability}"
+            )
+
+        if step.tool == "GIT_RUN":
+            _validate_git_run(step)
+        elif step.tool == "PATCH_APPLY":
+            _validate_patch_apply(step)
+        elif step.tool == "TEST_RUN":
+            _validate_test_run(step)
+        else:
+            raise ValueError(f"tool not allowed: {step.tool}")
