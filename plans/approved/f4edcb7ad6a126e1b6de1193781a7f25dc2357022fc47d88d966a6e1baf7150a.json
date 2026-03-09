@@ -1,0 +1,17 @@
+{
+  "plan_id": "sprint-e-smoke-1",
+  "steps": [
+    {
+      "step_id": 1,
+      "tool": "TEST_RUN",
+      "capability": "test.run",
+      "args": {
+        "argv": [
+          "python",
+          "--version"
+        ],
+        "timeout_seconds": 10
+      }
+    }
+  ]
+}

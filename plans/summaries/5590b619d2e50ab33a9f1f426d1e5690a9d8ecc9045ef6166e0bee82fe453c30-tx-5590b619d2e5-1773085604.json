@@ -1,0 +1,35 @@
+{
+  "diff_summary": {
+    "diff_stat": {
+      "denied": false,
+      "exit_code": 0,
+      "ok": true,
+      "reason": null,
+      "stderr": "warning: in the working copy of 'agent_core/plan_executor.py', LF will be replaced by CRLF the next time Git touches it\n",
+      "stdout": " agent_core/plan_executor.py | 558 +++++++++++++++++++++++++++++++++++++++++---\n 1 file changed, 520 insertions(+), 38 deletions(-)\n",
+      "timed_out": false
+    },
+    "status_short": {
+      "denied": false,
+      "exit_code": 0,
+      "ok": true,
+      "reason": null,
+      "stderr": "",
+      "stdout": " M ../agent_core/plan_executor.py\nA  ../plans/executed/.gitkeep\nA  ../plans/failures/.gitkeep\n?? ../plans/approved/\n?? ../plans/executed/f4edcb7ad6a126e1b6de1193781a7f25dc2357022fc47d88d966a6e1baf7150a.json\n?? ../plans/summaries/\n",
+      "timed_out": false
+    }
+  },
+  "drift_status": "not_enforced",
+  "mutation_count": 0,
+  "plan_hash": "5590b619d2e50ab33a9f1f426d1e5690a9d8ecc9045ef6166e0bee82fe453c30",
+  "replay_status": "not_replayed",
+  "requires_new_approval": false,
+  "result_status": "SUCCESS",
+  "steps_attempted": 1,
+  "steps_completed": 1,
+  "test_summary": {
+    "count": 1,
+    "passed": true
+  },
+  "tx_id": "tx-5590b619d2e5-1773085604"
+}

@@ -1,0 +1,18 @@
+{
+  "plan_id": "sprint-e-fail-2",
+  "steps": [
+    {
+      "step_id": 1,
+      "tool": "TEST_RUN",
+      "capability": "test.run",
+      "args": {
+        "argv": [
+          "python",
+          "-c",
+          "import sys; sys.exit(1)"
+        ],
+        "timeout_seconds": 10
+      }
+    }
+  ]
+}

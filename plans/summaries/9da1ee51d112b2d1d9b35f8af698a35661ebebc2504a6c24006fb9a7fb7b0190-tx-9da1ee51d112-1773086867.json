@@ -1,0 +1,35 @@
+{
+  "diff_summary": {
+    "diff_stat": {
+      "denied": false,
+      "exit_code": 0,
+      "ok": true,
+      "reason": null,
+      "stderr": "warning: in the working copy of 'agent_core/plan_executor.py', LF will be replaced by CRLF the next time Git touches it\n",
+      "stdout": " agent_core/plan_executor.py | 598 +++++++++++++++++++++++++++++++++++++++++---\n 1 file changed, 560 insertions(+), 38 deletions(-)\n",
+      "timed_out": false
+    },
+    "status_short": {
+      "denied": false,
+      "exit_code": 0,
+      "ok": true,
+      "reason": null,
+      "stderr": "",
+      "stdout": " M ../agent_core/plan_executor.py\nA  ../plans/executed/.gitkeep\nA  ../plans/failures/.gitkeep\n?? ../plans/approved/\n?? ../plans/executed/5590b619d2e50ab33a9f1f426d1e5690a9d8ecc9045ef6166e0bee82fe453c30.json\n?? ../plans/executed/97a85a1546567fa9c65a836f6ae8a70a634a8d8c8b210682a5cf3d9f9ab709e8.json\n?? ../plans/executed/f4edcb7ad6a126e1b6de1193781a7f25dc2357022fc47d88d966a6e1baf7150a.json\n?? ../plans/summaries/\n",
+      "timed_out": false
+    }
+  },
+  "drift_status": "not_enforced",
+  "mutation_count": 0,
+  "plan_hash": "9da1ee51d112b2d1d9b35f8af698a35661ebebc2504a6c24006fb9a7fb7b0190",
+  "replay_status": "not_replayed",
+  "requires_new_approval": true,
+  "result_status": "FAILED",
+  "steps_attempted": 1,
+  "steps_completed": 1,
+  "test_summary": {
+    "count": 1,
+    "passed": false
+  },
+  "tx_id": "tx-9da1ee51d112-1773086867"
+}
