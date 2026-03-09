@@ -45,10 +45,19 @@ Status: Complete
 ## Sprint D — Structured Plan Artifact
 
 Branch: sprint-d-structured-plan-artifact
+Status: Complete
+Closed: 2026-03-07
 
 Goal:
 Introduce deterministic PLAN artifact and approval gate.
 
+Outcome:
+- deterministic plan schema
+- explicit approval gate
+- execution only via approved plans
+- plan hash recorded in audit
+- raw execution commands blocked
+  
 Features:
 - deterministic plan schema
 - plan validation
@@ -67,5 +76,21 @@ plan.submit → validate_plan → store_pending_plan
 plan.approve → mark_plan_approved
 plan.execute → execute_plan
 
-Status: Complete
-Closed: 2026-03-07
+---
+
+## Sprint E — Deterministic Dev Loop
+
+Branch: sprint-e-deterministic-dev-loop
+Status: In Progress
+
+Goal:
+Close a small development cycle deterministically and safely:
+
+PLAN → EXECUTE → TEST → DIFF → SUMMARIZE
+
+Planned features:
+- automatic test execution
+- failure capture and classification
+- transaction-scoped execution
+- replay prevention
+- deterministic summary output
