@@ -78,3 +78,15 @@ DENIED: use PLAN
 The system now executes only deterministic, approved plans.
 
 This completes the structured planning foundation required for Sprint E.
+
+
+Note:
+
+Sprint D introduced the structured plan artifact.
+
+Sprint E extended this into the full deterministic execution loop:
+
+Plan → Execute → Test → Diff → Summarize.
+
+Execution control and lifecycle handling are now implemented in
+`agent_core/plan_executor.py`.

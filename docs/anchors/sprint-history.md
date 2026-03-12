@@ -81,16 +81,39 @@ plan.execute → execute_plan
 ## Sprint E — Deterministic Dev Loop
 
 Branch: sprint-e-deterministic-dev-loop
-Status: In Progress
+Status: Complete
+closed:2026-03-12
 
-Goal:
-Close a small development cycle deterministically and safely:
+Goal: Close a full development cycle automatically.
 
-PLAN → EXECUTE → TEST → DIFF → SUMMARIZE
+Deliver:
 
-Planned features:
-- automatic test execution
-- failure capture and classification
-- transaction-scoped execution
-- replay prevention
-- deterministic summary output
+- Plan → Execute → Test → Diff → Summarize execution loop
+- Deterministic step execution through ToolGateway
+- Transaction-scoped execution context
+- Execution summaries written to `plans/summaries`
+- Replay protection via executed markers
+- Failure envelopes written to `plans/failures`
+- Mutation cap enforcement
+- Step cap enforcement
+- Transaction time budget enforcement
+
+Artifacts:
+
+plans/approved/<plan_hash>.json  
+plans/executed/<plan_hash>.json  
+plans/summaries/<plan_hash>-<tx_id>.json  
+plans/failures/<plan_hash>-<tx_id>.json  
+
+Execution Path:
+
+Orchestrator  
+→ AgentLoop  
+→ execute_plan  
+→ execute_step  
+→ ToolGateway  
+→ PolicyEngine  
+→ Tool Implementation  
+
+Outcome:
+Agent can complete small development cycles deterministically.

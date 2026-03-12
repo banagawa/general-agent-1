@@ -16,16 +16,22 @@ Execution is deterministic and policy controlled.
 
 # Architecture Overview
 
-Execution pipeline:
+Architecture
 
-AgentLoop
- → PlanExecutor
- → execute_step
- → ToolGateway
- → PolicyEngine
- → Tool
+Human
+→ plan.submit
+→ plan.approve
+→ plan.execute
+→ execute_plan
+→ execute_step
+→ ToolGateway
+→ PolicyEngine
+→ Tool Implementation
 
-All tools are executed through the ToolGateway which enforces capability tokens and policy checks.
+All tools execute through ToolGateway.
+
+Execution is deterministic and bound to approved plans.
+
 
 ---
 

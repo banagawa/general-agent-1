@@ -1,6 +1,6 @@
 # Sprint D — Structured Plan Artifact
 
-Status: In progress
+Status: Complete
 Classification: Enforcement Extension (No Free-Form Execution)
 
 Branch: sprint-d-structured-plan-artifact
@@ -91,3 +91,25 @@ Audit is append-only; events additive only.
   - approved plan allows execution path
   - plan hash stable across runs
   - audit events emitted for allow + deny
+
+---
+
+# Sprint E Extension
+
+The plan artifact introduced in Sprint D is now executed by the
+deterministic execution engine.
+
+Execution engine responsibilities:
+
+- Step execution
+- Capability token issuance
+- Mutation counting
+- Transaction time enforcement
+- Diff capture
+- Execution summary generation
+- Replay prevention
+- Failure envelope creation
+
+Execution implementation lives in:
+
+agent_core/plan_executor.py
