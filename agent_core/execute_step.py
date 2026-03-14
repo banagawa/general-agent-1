@@ -4,8 +4,10 @@ from sandbox.mounts import get_workspace_root
 
 from .capability_guard import check_capability
 
+from agent_core.security_invariants import assert_security_invariants
 
 def execute_step(gateway, step):
+    assert_security_invariants(direct_tool_bypass=False)
     check_capability(step)
 
     if step.tool == "GIT_RUN":

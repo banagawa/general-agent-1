@@ -4,7 +4,7 @@ import subprocess
 import time
 from pathlib import Path
 from typing import Sequence, Dict, Any
-
+from agent_core.security_invariants import assert_security_invariants
 
 MAX_OUTPUT_BYTES = 64 * 1024  # 64KB
 DEFAULT_TIMEOUT_SECONDS = 10
@@ -34,6 +34,7 @@ def run_cmd(
     start = time.perf_counter()
 
     try:
+        assert_security_invariants(shell=False, direct_tool_bypass=False)
         result = subprocess.run(
             list(argv),
             shell=False,                  # critical

@@ -1,168 +1,91 @@
+# SECURITY.md — Control Contract
 
-# Security Model
+Status: Governing Document
 
-This document defines the threat model and enforcement guarantees of General Agent.
+Purpose:
+Define the security control model for the General Agent system.
 
----
-
-## Threat Model
-
-This system assumes:
-
-- Untrusted user input may reach tool layer.
-- Accidental misuse is more likely than malicious attack.
-- Command execution must not escalate beyond workspace.
-- Writes must never occur without visibility.
-
-This system does NOT currently defend against:
-- OS-level privilege escalation
-- Kernel-level attacks
-- External network exploitation (no connectors implemented)
+Goal:
+Enable bounded usefulness — the agent can complete real development work
+while remaining constrained so it cannot damage the system, exfiltrate data,
+or execute uncontrolled actions.
 
 ---
 
-## Enforcement Layers
+## Governing Precedence
 
-### 1. Workspace Boundary
+If any document conflicts with this file, this file wins.
 
-All file access is constrained to WORKSPACE_ROOT.
+Related governing docs:
 
-Enforcement:
-- Path canonicalization via resolve()
-- relative_to() boundary check
-- Fail closed on error
-
----
-
-### 2. Deny Patterns
-
-Access denied for:
-- .env
-- secrets
-- credentials
+- docs/anchors/security-invariants.md
+- docs/anchors/architecture-contract.md
+- docs/anchors/system-state-v1.md
+- CONTRIBUTING.md
 
 ---
 
-### 3. Patch-Only Writes
+## Core Security Invariants
 
-- No full-file overwrite
-- All writes diff-visible
-- Explicit approval required
-- Revocation enforced per invocation
+These rules must never weaken.
 
----
+1. Execution Choke Point
 
-### 4. Command Execution Controls
+All execution flows through:
 
-CMD_RUN enforces:
+Orchestrator → AgentLoop → ToolGateway → PolicyEngine → Tool
 
-- Allowlisted commands only
-- Subcommand validation
-- argv-only execution
-- shell=False
-- Forced cwd to workspace
-- Timeout enforcement
-- Output truncation
+2. Deny By Default
 
-Denied commands:
-- bash
-- sh
-- cmd
-- powershell
-- curl
-- wget
-- Arbitrary interpreters
+Any action not explicitly allowed by policy must be denied.
 
----
+3. Workspace Boundary
 
-### Git Execution Controls (GIT_RUN)
+Filesystem access must remain within WORKSPACE_ROOT.
 
-Git operations are isolated behind a dedicated tool.
+4. Patch Only Mutation
 
-Restrictions:
-- Only allowlisted subcommands permitted
-- Unknown flags rejected
-- No config override flags (-c, --git-dir, --work-tree, -C)
-- No remote or branch operations (push, pull, fetch, clone, remote, checkout, switch, branch, merge, rebase, tag, submodule)
-- No network access
-- Workspace-bound execution only
-- Mutating operations require capability token
-- All attempts audited (allow + deny)
+Files may not be overwritten directly.
+All mutation must be diff-visible and approval gated.
 
----
-### 5. Audit Guarantees
+5. Explicit Approval
 
-Every tool invocation logs:
+Mutating actions require explicit approval.
 
-- action
-- timestamp
-- structured metadata
-- allow or deny result
+6. Append Only Audit
 
-Audit log is append-only.
+All tool actions must log:
 
+- allow
+- deny
+- failure
 
-### 6. Structured Plan Gating (Planned)
+Audit logs are append-only.
 
-Planned enforcement:
-- No free-form execution
-- Tool execution only from an approved deterministic PLAN
-- Plan schema violations deny + audit
-- Plan hash recorded in audit for traceability
+7. Fail Closed Behavior
+
+Unexpected conditions must deny and log.
 
 ---
 
-## Fail-Closed Guarantee
+## Capability Expansion Rule
 
-If:
-- Path resolution fails
-- Policy check fails
-- Token invalid (future)
-- Timeout occurs
-- Unexpected exception
+New capabilities are allowed only if:
 
-The operation must deny and log.
-
----
-
-## Revocation Model
-
-Current:
-- Global write revocation persisted on disk.
-
-Planned:
-- Tokenized capability model
-- Expiry enforcement
-- Revocation keyed by token ID
+- execution remains ToolGateway mediated
+- policy gating remains intact
+- workspace boundary remains enforced
+- mutations remain visible
+- actions remain auditable
 
 ---
 
-## Security Philosophy
+## Network Boundary
 
-The system is designed to:
+Network access is disabled by default.
 
-- Minimize blast radius
-- Make mutation visible
-- Preserve auditability
-- Prefer denial over uncertainty
-- Avoid implicit privilege
+If introduced, it must:
 
-Any change weakening these properties must be reviewed and documented.
-
----
-
-## Reporting Issues
-
-Security concerns should be documented as:
-
-- Description
-- Reproduction steps
-- Expected behavior
-- Actual behavior
-- Proposed mitigation
-
-Security changes must include:
-
-- Policy update
-- Audit update
-- Documentation update
+- be explicitly documented
+- be narrowly scoped
+- not bypass ToolGateway

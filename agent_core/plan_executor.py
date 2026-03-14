@@ -23,6 +23,7 @@ from .plan_store import (
     store_pending_plan,
 )
 from .plan_validator import validate_plan
+from agent_core.security_invariants import assert_security_invariants
 
 MAX_PLAN_STEPS = 20
 MAX_TX_SECONDS = 120
@@ -114,6 +115,7 @@ def _step_with_token(step, cap_token_id: str):
     return replace(step, args=args)
 
 def execute_plan(gateway, plan_hash: str) -> Dict[str, Any]:
+    assert_security_invariants(direct_tool_bypass=False)
     if not plan_is_approved(plan_hash):
         _audit_execution_denied(plan_hash, "plan not approved")
         raise RuntimeError("plan not approved")

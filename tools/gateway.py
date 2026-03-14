@@ -9,7 +9,7 @@ from policy.engine import PolicyEngine
 from sandbox.mounts import get_workspace_root
 from tools.cmd_tools import run_cmd
 from tools.fs_tools import FileSystemTools
-
+from agent_core.security_invariants import assert_security_invariants
 
 class ToolGateway:
     def __init__(self):
@@ -45,6 +45,7 @@ class ToolGateway:
         new_content: str,
         cap_token_id: Optional[str] = None,
     ):
+        assert_security_invariants(direct_tool_bypass=False)
         vr = validate_token(
             token_id=cap_token_id,
             action="FS_WRITE_PATCH",
@@ -104,6 +105,7 @@ class ToolGateway:
         timeout_seconds: int = 10,
         cap_token_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        assert_security_invariants(shell=False, direct_tool_bypass=False)
         argv_list = list(argv)
 
         vr = validate_token(
@@ -181,6 +183,7 @@ class ToolGateway:
         timeout_seconds: int = 10,
         cap_token_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        assert_security_invariants(direct_tool_bypass=False)
         argv_list = list(argv)
 
         sub = ""
