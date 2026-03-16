@@ -11,16 +11,18 @@ from .plan_hash import compute_plan_hash
 from .plan_validator import validate_plan
 from .plan_store import (
     load_approved_plan,
+    load_approved_plan_meta,
     mark_plan_approved,
+    overwrite_executed_marker,
     plan_has_executed,
     plan_is_approved,
     store_pending_plan,
+    write_approved_plan_meta,
     write_executed_marker,
-    overwrite_executed_marker,
     write_failure_envelope,
     write_summary,
 )
-
+from .workspace_fingerprint import compute_workspace_fingerprint
 
 TOKEN_ACTION_BY_TOOL = {
     "TEST_RUN": "CMD_RUN",
@@ -60,10 +62,24 @@ def submit_plan(plan):
 def approve_plan(plan_hash: str):
     mark_plan_approved(plan_hash)
 
+    fingerprint = compute_workspace_fingerprint()
+
+    write_approved_plan_meta(
+        plan_hash,
+        {
+            "plan_hash": plan_hash,
+            "workspace_fingerprint": fingerprint,
+            "drift_check_enabled": True,
+            "approved_at": _utc_now_iso(),
+        },
+    )
+
     log_event(
         "PLAN_APPROVED",
         {
             "plan_hash": plan_hash,
+            "workspace_fingerprint": fingerprint,
+            "drift_check_enabled": True,
         },
     )
 
@@ -71,7 +87,6 @@ def approve_plan(plan_hash: str):
         "plan_hash": plan_hash,
         "status": "APPROVED",
     }
-
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -179,16 +194,25 @@ def _test_summary_from_results(results: List[Dict]) -> Dict:
 def _classify_success_or_failure(results: list[dict], error: Exception | None) -> str:
     if error is not None:
         message = str(error).lower()
+
         if "not approved" in message:
             return "PLAN_INVALID"
+
         if "already executed" in message or "replay" in message:
             return "REPLAY_DENIED"
+
+        if "workspace drift" in message or "drift detected" in message:
+            return "WORKSPACE_DRIFT_DENIED"
+
         if "step cap" in message:
             return "STEP_LIMIT_EXCEEDED"
+
         if "time budget" in message:
             return "TIME_BUDGET_EXCEEDED"
+
         if "capability" in message or "insufficient_scope" in message:
             return "CAPABILITY_DENIED"
+
         return "FAILED"
 
     for item in results:
@@ -214,6 +238,7 @@ def _classify_success_or_failure(results: list[dict], error: Exception | None) -
                     return "FAILED"
 
     return "SUCCESS"
+
 
 def _build_summary(
     *,
@@ -408,6 +433,8 @@ def execute_plan(gateway, plan_hash: str):
 
     plan = load_approved_plan(plan_hash)
 
+    _verify_workspace_drift(plan_hash)
+
     if len(plan.steps) > MAX_STEPS_PER_EXECUTION:
 
         log_event(
@@ -499,3 +526,25 @@ def execute_plan(gateway, plan_hash: str):
             started_at=started_at,
             error=e,
         )
+def _verify_workspace_drift(plan_hash: str) -> None:
+    meta = load_approved_plan_meta(plan_hash)
+
+    if not meta.get("drift_check_enabled", False):
+        return
+
+    approved_fingerprint = meta["workspace_fingerprint"]
+    current_fingerprint = compute_workspace_fingerprint()
+
+    if current_fingerprint == approved_fingerprint:
+        return
+
+    log_event(
+        "PLAN_EXECUTION_DRIFT_DENIED",
+        {
+            "plan_hash": plan_hash,
+            "approved_fingerprint": approved_fingerprint,
+            "current_fingerprint": current_fingerprint,
+        },
+    )
+
+    raise RuntimeError("workspace drift detected")

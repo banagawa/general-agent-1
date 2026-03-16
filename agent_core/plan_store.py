@@ -16,13 +16,11 @@ EXECUTED_DIR = PLAN_ROOT / "executed"
 FAILURES_DIR = PLAN_ROOT / "failures"
 SUMMARIES_DIR = PLAN_ROOT / "summaries"
 
-SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
 PENDING_DIR.mkdir(parents=True, exist_ok=True)
 APPROVED_DIR.mkdir(parents=True, exist_ok=True)
 EXECUTED_DIR.mkdir(parents=True, exist_ok=True)
 FAILURES_DIR.mkdir(parents=True, exist_ok=True)
-
-
+SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _plan_to_dict(plan: Plan) -> dict:
@@ -70,12 +68,20 @@ def approved_plan_path(plan_hash: str) -> Path:
     return APPROVED_DIR / f"{plan_hash}.json"
 
 
+def approved_plan_meta_path(plan_hash: str) -> Path:
+    return APPROVED_DIR / f"{plan_hash}.meta.json"
+
+
 def executed_plan_path(plan_hash: str) -> Path:
     return EXECUTED_DIR / f"{plan_hash}.json"
 
 
 def failure_envelope_path(plan_hash: str, tx_id: str) -> Path:
     return FAILURES_DIR / f"{plan_hash}-{tx_id}.json"
+
+
+def summary_path(plan_hash: str, tx_id: str) -> Path:
+    return SUMMARIES_DIR / f"{plan_hash}-{tx_id}.json"
 
 
 def store_pending_plan(plan_hash: str, plan: Plan) -> None:
@@ -94,6 +100,19 @@ def load_approved_plan(plan_hash: str) -> Plan:
     if not path.exists():
         raise ValueError("approved plan not found")
     return _read_plan(path)
+
+
+def load_approved_plan_meta(plan_hash: str) -> dict:
+    path = approved_plan_meta_path(plan_hash)
+    if not path.exists():
+        raise ValueError("approved plan metadata not found")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_approved_plan_meta(plan_hash: str, payload: dict) -> Path:
+    path = approved_plan_meta_path(plan_hash)
+    _write_json(path, payload)
+    return path
 
 
 def mark_plan_approved(plan_hash: str) -> Plan:
@@ -124,6 +143,7 @@ def write_executed_marker(plan_hash: str, payload: dict) -> Path:
     _write_json(path, payload)
     return path
 
+
 def overwrite_executed_marker(plan_hash: str, payload: dict) -> Path:
     path = executed_plan_path(plan_hash)
     if not path.exists():
@@ -131,13 +151,11 @@ def overwrite_executed_marker(plan_hash: str, payload: dict) -> Path:
     _write_json(path, payload)
     return path
 
+
 def write_failure_envelope(plan_hash: str, tx_id: str, payload: dict) -> Path:
     path = failure_envelope_path(plan_hash, tx_id)
     _write_json(path, payload)
     return path
-
-def summary_path(plan_hash: str, tx_id: str) -> Path:
-    return SUMMARIES_DIR / f"{plan_hash}-{tx_id}.json"
 
 
 def write_summary(plan_hash: str, tx_id: str, payload: dict) -> Path:
