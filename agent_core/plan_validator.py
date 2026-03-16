@@ -1,5 +1,6 @@
 from .plan_schema import Plan, ToolStep
 
+MAX_STEPS_PER_PLAN = 25
 
 ALLOWED_TOOLS = {
     "GIT_RUN",
@@ -69,6 +70,9 @@ def validate_plan(plan: Plan) -> None:
 
     if len(plan.steps) == 0:
         raise ValueError("steps must be non-empty")
+
+    if len(plan.steps) > MAX_STEPS_PER_PLAN:
+        raise ValueError(f"steps exceed max of {MAX_STEPS_PER_PLAN}")
 
     seen_ids = set()
 
