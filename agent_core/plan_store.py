@@ -32,8 +32,8 @@ def _plan_from_dict(data: dict) -> Plan:
     return Plan(
         plan_id=data["plan_id"],
         steps=steps,
+        metadata=data.get("metadata", {}),
     )
-
 
 def _read_plan(path: Path) -> Plan:
     data = json.loads(path.read_text(encoding="utf-8"))

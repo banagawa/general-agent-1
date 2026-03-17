@@ -14,6 +14,7 @@ class ToolStep:
 class Plan:
     plan_id: str
     steps: Tuple[ToolStep, ...] = field(default_factory=tuple)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not isinstance(self.plan_id, str) or not self.plan_id.strip():
@@ -24,5 +25,7 @@ class Plan:
         for step in normalized_steps:
             if not isinstance(step, ToolStep):
                 raise ValueError("all steps must be ToolStep")
+            if not isinstance(self.metadata, dict):
+                raise ValueError("metadata must be dict")
 
         object.__setattr__(self, "steps", normalized_steps)

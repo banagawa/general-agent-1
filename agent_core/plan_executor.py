@@ -91,6 +91,22 @@ def approve_plan(plan_hash: str):
 # -----------------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------------
+def _intent_from_plan(plan) -> Dict:
+    metadata = getattr(plan, "metadata", {})
+    if not isinstance(metadata, dict):
+        return {}
+
+    intent = metadata.get("intent", {})
+    if not isinstance(intent, dict):
+        return {}
+
+    goal = intent.get("goal")
+    success_criteria = intent.get("success_criteria")
+
+    return {
+        "goal": goal if isinstance(goal, str) else None,
+        "success_criteria": success_criteria if isinstance(success_criteria, list) else [],
+    }
 
 def _utc_now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -242,6 +258,7 @@ def _classify_success_or_failure(results: list[dict], error: Exception | None) -
 
 def _build_summary(
     *,
+    plan,
     plan_hash: str,
     tx_id: str,
     results: List[Dict],
@@ -250,6 +267,7 @@ def _build_summary(
     finished_at: str,
 ) -> Dict:
 
+    intent = _intent_from_plan(plan)
     summary = {
         "plan_hash": plan_hash,
         "tx_id": tx_id,
@@ -261,6 +279,7 @@ def _build_summary(
         "test_summary": _test_summary_from_results(results),
         "changed_paths": _changed_paths_from_results(results),
         "requires_new_approval": status != "SUCCESS",
+        "intent": intent,
     }
 
     return summary
@@ -268,6 +287,7 @@ def _build_summary(
 
 def _build_failure_envelope(
     *,
+    plan,
     plan_hash: str,
     tx_id: str,
     results: List[Dict],
@@ -275,6 +295,7 @@ def _build_failure_envelope(
     error: Exception,
 ) -> Dict:
 
+    intent = _intent_from_plan(plan)
     failing_step_id = None
     failing_tool = None
     exit_code = None
@@ -302,11 +323,13 @@ def _build_failure_envelope(
         "error": str(error),
         "test_summary": _test_summary_from_results(results),
         "requires_new_approval": True,
+        "intent": intent,
     }
 
 
 def _finalize_execution(
     *,
+    plan,
     plan_hash: str,
     tx_id: str,
     results: List[Dict],
@@ -314,10 +337,10 @@ def _finalize_execution(
     started_at: str,
     error: Exception | None = None,
 ):
-
     finished_at = _utc_now_iso()
 
     summary = _build_summary(
+        plan = plan,
         plan_hash=plan_hash,
         tx_id=tx_id,
         results=results,
@@ -369,6 +392,7 @@ def _finalize_execution(
         return payload
 
     envelope = _build_failure_envelope(
+        plan=plan,
         plan_hash=plan_hash,
         tx_id=tx_id,
         results=results,
@@ -507,6 +531,7 @@ def execute_plan(gateway, plan_hash: str):
         status = _classify_success_or_failure(results, None)
 
         return _finalize_execution(
+            plan=plan,
             plan_hash=plan_hash,
             tx_id=tx_id,
             results=results,
@@ -519,6 +544,7 @@ def execute_plan(gateway, plan_hash: str):
         failure_class = _classify_success_or_failure(results, e)
 
         return _finalize_execution(
+            plan=plan,
             plan_hash=plan_hash,
             tx_id=tx_id,
             results=results,

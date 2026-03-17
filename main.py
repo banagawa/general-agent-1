@@ -8,6 +8,7 @@ ALLOWED_COMMANDS = {
     "plan.submit",
     "plan.approve",
     "plan.execute",
+    "task.plan",
 }
 
 PLAN_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -39,9 +40,9 @@ def parse_task_arg(raw: str) -> str:
                 f"{command} payload must be a lowercase 64-character hex hash"
             )
 
-    if command == "plan.submit":
-        if not payload:
-            raise ValueError("plan.submit requires JSON payload")
+    if command in {"plan.submit", "task.plan"}:
+        if not payload.strip():
+            raise ValueError(f"{command} requires payload")
 
     return raw
 
