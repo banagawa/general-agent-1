@@ -1,93 +1,193 @@
 # System State v1
 
-This document describes the architecture after completion of Sprint E.
+This document describes the merged system state after Sprint E.
 
-------------------------------------------------------------------------
+---
 
 # Core Architecture
 
 Execution pipeline:
 
-Orchestrator → AgentLoop → PlanExecutor → execute_step → ToolGateway →
-PolicyEngine → Tool
+Human → `task.plan` or `plan.submit` → `plan.approve` → `plan.execute` → Orchestrator → AgentLoop → PlanExecutor → execute_step → ToolGateway → PolicyEngine → Tool
 
 All tool execution passes through ToolGateway.
 
-Execution is deterministic and bound to approved plans.
+Execution remains deterministic, approval-bound, and fail-closed.
 
-------------------------------------------------------------------------
+---
 
 # Security Invariants
 
-The system maintains the following invariants:
+The system currently maintains these invariants:
 
--   ToolGateway is the single execution choke point
--   deny-by-default enforcement
--   workspace boundary isolation
--   patch-only file writes
--   append-only audit logging
+- ToolGateway is the single execution choke point
+- deny-by-default enforcement
+- workspace boundary isolation
+- patch-only file writes
+- append-only audit logging
+- approved-plan-only execution
+- workspace-fingerprint drift denial before execution
+- capability-scoped step execution
 
-------------------------------------------------------------------------
+---
 
-# Capability Enforcement
+# Planner State
 
-Every tool call requires a capability token.
+The runtime now exposes a planner front door:
 
-Tokens: - short-lived - scoped - validated by the PolicyEngine
+- `task.plan:<task>`
 
-Tokens are issued automatically for approved plan steps.
+Planner flow:
 
-------------------------------------------------------------------------
+`task.plan` → `TaskSpec` → planner → validated pending plan
+
+Planner source may be:
+
+- `deterministic`
+- `llm`
+
+Planner output is still just a proposal.
+It does not execute tools, approve plans, or bypass policy.
+
+Planner metadata recorded on submitted plans includes:
+
+- planner source
+- intent goal
+- success criteria
+
+---
 
 # Plan Execution Model
 
 Execution requires an approved plan.
 
-Commands:
+Supported commands:
 
-plan.submit\
-plan.approve\
-plan.execute
+- `task.plan`
+- `plan.submit`
+- `plan.approve`
+- `plan.execute`
 
 Execution lifecycle:
 
-plan.submit → validate_plan → store_pending_plan\
-plan.approve → mark_plan_approved\
-plan.execute → execute_plan → execute_step → ToolGateway
+`task.plan` or `plan.submit`  
+→ pending plan created  
+→ `plan.approve` records approval metadata and workspace fingerprint  
+→ `plan.execute` verifies approval and drift state  
+→ deterministic step execution begins
 
 Execution artifacts:
 
-plans/executed/`<plan_hash>`{=html}.json\
-plans/summaries/`<plan_hash>`{=html}-`<tx_id>`{=html}.json\
-plans/failures/`<plan_hash>`{=html}-`<tx_id>`{=html}.json
+- `plans/pending/<plan_hash>.json`
+- `plans/approved/<plan_hash>.json`
+- `plans/approved/<plan_hash>.meta.json`
+- `plans/executed/<plan_hash>.json`
+- `plans/summaries/<plan_hash>-<tx_id>.json`
+- `plans/failures/<plan_hash>-<tx_id>.json`
 
-------------------------------------------------------------------------
+---
+
+# Approval and Drift Binding
+
+At approval time the system writes:
+
+- `workspace_fingerprint`
+- `drift_check_enabled`
+- `approved_at`
+
+At execution time the current workspace fingerprint is recomputed.
+
+If fingerprints differ:
+- execution is denied
+- `PLAN_EXECUTION_DRIFT_DENIED` is logged
+- a new approval cycle is required
+
+---
+
+# Execution Status Model
+
+Observed execution result classes include:
+
+- `SUCCESS`
+- `FAILED`
+- `TEST_FAILURE`
+- `PATCH_REJECTED`
+- `PLAN_INVALID`
+- `REPLAY_DENIED`
+- `WORKSPACE_DRIFT_DENIED`
+- `STEP_LIMIT_EXCEEDED`
+- `TIME_BUDGET_EXCEEDED`
+- `CAPABILITY_DENIED`
+
+Execution summaries record:
+
+- `plan_hash`
+- `tx_id`
+- `execution_status`
+- `started_at`
+- `finished_at`
+- `steps_attempted`
+- `steps_completed`
+- `test_summary`
+- `changed_paths`
+- `requires_new_approval`
+- `intent`
+
+Failure envelopes record at least:
+
+- `plan_hash`
+- `tx_id`
+- `failure_class`
+- `failing_step_id`
+- `tool`
+- `exit_code`
+- `timed_out`
+- `changed_paths`
+- `error`
+- `test_summary`
+- `requires_new_approval`
+- `intent`
+
+---
 
 # Audit Lifecycle
 
-PLAN_CREATED\
-PLAN_APPROVED\
-PLAN_EXECUTION_STARTED\
-PLAN_EXECUTION_FINISHED\
-PLAN_EXECUTION_DENIED\
-PLAN_EXECUTION_FAILED
+Core lifecycle events:
+
+- `PLAN_CREATED`
+- `PLAN_APPROVED`
+- `PLAN_EXECUTION_STARTED`
+- `PLAN_SUMMARY_RECORDED`
+- `PLAN_EXECUTION_FINISHED`
+- `PLAN_FAILURE_ENVELOPE_RECORDED`
+- `PLAN_EXECUTION_FAILED`
+- `PLAN_EXECUTION_REPLAY_DENIED`
+- `PLAN_EXECUTION_DRIFT_DENIED`
+
+Planner lifecycle events:
+
+- `PLANNER_REQUESTED`
+- `PLANNER_PLAN_CREATED`
+- `PLANNER_DENIED`
 
 Audit logs are append-only.
 
-------------------------------------------------------------------------
+---
 
 # Sprint Status
 
-  Sprint     Status
-  ---------- ----------
-  Sprint A   Complete
-  Sprint B   Complete
-  Sprint C   Complete
-  Sprint D   Complete
-  Sprint E   Complete
+| Sprint | Status |
+|---|---|
+| Sprint A | Complete |
+| Sprint B | Complete |
+| Sprint C | Complete |
+| Sprint D | Complete |
+| Sprint E | Complete |
 
-------------------------------------------------------------------------
+---
 
 # Next Phase
 
-Sprint F --- Controlled Autonomy Mode
+Sprint F — Controlled Autonomy Mode
+
+That phase is next. It is not the current merged behavior.

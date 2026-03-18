@@ -1,190 +1,287 @@
 # Sprint E Closeout
 
-Deterministic Execute--Test--Diff--Summarize Loop
+Deterministic Dev Loop + Planner-Gated Entry
 
 ## Goal
 
-Implement a deterministic plan execution loop that:
+Complete Sprint E without weakening the security model.
 
-• executes approved plans only\
-• records execution results\
-• captures repository diff state\
-• produces a deterministic execution summary\
-• prevents replay\
-• records failure envelopes for failed runs
+Sprint E scope, as merged, was:
 
-------------------------------------------------------------------------
+- deterministic approved-plan execution
+- execution summaries and failure envelopes
+- replay denial
+- workspace drift binding at approval time
+- planner-assisted plan creation through `task.plan`
 
-# Architecture Invariants (Preserved)
+The result is a full proposal → approval → execution loop, not just an execute/test/diff slice.
 
-ToolGateway choke point\
-PolicyEngine deny-by-default\
-Workspace boundary enforcement\
-Patch-only file writes\
-Append-only audit log
+---
 
-Execution path:
+# Architecture Invariants Preserved
 
-Orchestrator\
-→ AgentLoop\
-→ execute_plan\
-→ execute_step\
-→ ToolGateway\
-→ PolicyEngine\
+The following invariants remained intact through Sprint E:
+
+- ToolGateway choke point
+- PolicyEngine deny-by-default
+- workspace boundary enforcement
+- patch-only file writes
+- append-only audit log
+- fail-closed execution
+
+Merged execution path:
+
+Human  
+→ `task.plan` or `plan.submit`  
+→ `plan.approve`  
+→ `plan.execute`  
+→ Orchestrator  
+→ AgentLoop  
+→ PlanExecutor  
+→ execute_step  
+→ ToolGateway  
+→ PolicyEngine  
 → Tool Implementation
 
-------------------------------------------------------------------------
+Planner integration did not introduce a bypass.
 
-# Plan Lifecycle
+---
 
-## submit
+# What Sprint E Added
 
-    plan.submit
-    → plans/pending/<plan_hash>.json
+## 1) Deterministic execution loop
 
-## approve
+`plan.execute` now runs a bounded deterministic step loop.
 
-    plan.approve
-    → plans/approved/<plan_hash>.json
+Per step:
+1. verify execution remains inside the transaction budget
+2. issue a step-scoped capability token
+3. execute the step through ToolGateway
+4. record the step result
+5. accumulate changed paths and test outcomes
+6. derive final execution status
 
-## execute
+Outputs:
+- execution marker
+- execution summary
+- optional failure envelope
 
-    plan.execute
-    → deterministic step loop
+## 2) Replay denial
 
-Artifacts created:
+A previously executed approved plan cannot be executed again.
 
-    plans/executed/<plan_hash>.json
-    plans/summaries/<plan_hash>-<tx_id>.json
-    plans/failures/<plan_hash>-<tx_id>.json
+Replay attempt outcome:
+- execution denied
+- `PLAN_EXECUTION_REPLAY_DENIED` logged
 
-------------------------------------------------------------------------
+## 3) Workspace drift binding
 
-# Execution Loop Behavior
+Approval now records a deterministic workspace fingerprint.
 
-For each step:
+Execution verifies the current workspace fingerprint before the run begins.
 
-1.  enforce transaction time budget
-2.  issue capability token
-3.  execute step through ToolGateway
-4.  record step result
-5.  track mutation count
-6.  capture changed paths
+If drift is detected:
+- execution is denied before step execution
+- `PLAN_EXECUTION_DRIFT_DENIED` logged
+- new approval is required
 
-After loop:
+## 4) Planner front door
 
-    collect_test_summary()
-    collect_repo_diff()
-    derive_result_status()
+`task.plan:<task>` was added.
 
-------------------------------------------------------------------------
+Flow:
+- raw task converted into `TaskSpec`
+- planner generates PLAN JSON
+- plan metadata is attached
+- plan is validated
+- pending plan is stored
+- normal approval path still required
 
-# Success Path
+Planner metadata includes:
+- planner source: `deterministic` or `llm`
+- intent goal
+- success criteria
 
-If all steps succeed:
+The planner may propose. It may not execute.
 
-Artifacts written:
+---
 
-    plans/executed/<plan_hash>.json
-    plans/summaries/<plan_hash>-<tx_id>.json
+# Plan Lifecycle After Merge
 
-Audit events:
+## Submit or plan
 
-    EXECUTION_STARTED
-    EXECUTION_FINISHED
+Two valid creation paths now exist:
 
-Replay prevention enforced.
+### Human-authored plan
+```text
+plan.submit:<json>
+```
 
-------------------------------------------------------------------------
+### Planner-authored proposal
+```text
+task.plan:<task>
+```
 
-# Failure Path
+Both end in a pending plan artifact:
 
-If any step fails:
+- `plans/pending/<plan_hash>.json`
 
-Artifacts written:
+## Approve
 
-    plans/failures/<plan_hash>-<tx_id>.json
-    plans/summaries/<plan_hash>-<tx_id>.json
+```text
+plan.approve:<plan_hash>
+```
 
-Failure envelope includes:
+Approval writes:
 
-    plan_hash
-    tx_id
-    failure_class
-    failing_step_id
-    tool
-    changed_paths
-    test_summary
-    diff_summary
-    requires_new_approval
+- `plans/approved/<plan_hash>.json`
+- `plans/approved/<plan_hash>.meta.json`
 
-Executed marker is NOT written.
+Approval metadata includes:
 
-Audit event:
+- `plan_hash`
+- `workspace_fingerprint`
+- `drift_check_enabled`
+- `approved_at`
 
-    EXECUTION_FAILED
+## Execute
 
-------------------------------------------------------------------------
+```text
+plan.execute:<plan_hash>
+```
 
-# Replay Protection
+Execution writes:
 
-Second execution attempt:
+- `plans/executed/<plan_hash>.json`
+- `plans/summaries/<plan_hash>-<tx_id>.json`
 
-    plan already executed
+On failure it also writes:
 
-No new artifacts created.
+- `plans/failures/<plan_hash>-<tx_id>.json`
 
-------------------------------------------------------------------------
+---
+
+# Summary Artifact Shape
+
+Sprint E made summaries first-class runtime artifacts.
+
+Summary fields include:
+
+- `plan_hash`
+- `tx_id`
+- `execution_status`
+- `started_at`
+- `finished_at`
+- `steps_attempted`
+- `steps_completed`
+- `test_summary`
+- `changed_paths`
+- `requires_new_approval`
+- `intent`
+
+`requires_new_approval` is false only on `SUCCESS`.
+
+---
+
+# Failure Envelope Shape
+
+Failure envelopes are written for non-success outcomes.
+
+Fields include:
+
+- `plan_hash`
+- `tx_id`
+- `result_status`
+- `failure_class`
+- `failing_step_id`
+- `tool`
+- `exit_code`
+- `timed_out`
+- `changed_paths`
+- `error`
+- `test_summary`
+- `requires_new_approval`
+- `intent`
+
+This captures enough state to explain why the run stopped without pretending the plan completed successfully.
+
+---
+
+# Audit Events Observed in the Sprint E State
+
+Execution lifecycle:
+- `PLAN_CREATED`
+- `PLAN_APPROVED`
+- `PLAN_EXECUTION_STARTED`
+- `PLAN_SUMMARY_RECORDED`
+- `PLAN_EXECUTION_FINISHED`
+- `PLAN_FAILURE_ENVELOPE_RECORDED`
+- `PLAN_EXECUTION_FAILED`
+- `PLAN_EXECUTION_REPLAY_DENIED`
+- `PLAN_EXECUTION_DRIFT_DENIED`
+
+Planner lifecycle:
+- `PLANNER_REQUESTED`
+- `PLANNER_PLAN_CREATED`
+- `PLANNER_DENIED`
+
+This is materially richer than the earlier Sprint E docs that only described start/finish/failure.
+
+---
 
 # Limits Enforced
 
-    MAX_PLAN_STEPS
-    MAX_TX_SECONDS
-    MAX_MUTATIONS
+Sprint E enforces bounded execution at runtime.
 
-Violation → execution failure.
+Current execution limits in code:
+- max steps per execution: `25`
+- max execution seconds: `120`
 
-------------------------------------------------------------------------
+If limits are violated, execution fails closed.
 
-# Verification Tests Performed
+---
+
+# Verification Coverage Reflected by the Merged State
+
+The merged repository state shows Sprint E covering these behaviors:
 
 ## Success path
-
-submit → approve → execute
-
-Artifacts observed:
-
-    plans/executed/<hash>.json
-    plans/summaries/<hash>-<tx>.json
-
-## Replay denial
-
-Second execution attempt rejected.
+- approved plan executes
+- summary written
+- executed marker finalized
 
 ## Failure path
+- failure status classified
+- summary still written
+- failure envelope written
+- executed marker finalized with non-success status
 
-TEST_RUN returning exit code 1 produced:
+## Replay denial
+- second execution attempt rejected
 
-    plans/failures/<hash>-<tx>.json
-    plans/summaries/<hash>-<tx>.json
+## Drift denial
+- changed workspace after approval rejects execution
 
-Executed marker not written.
+## Planner path
+- `task.plan` creates a validated pending plan
+- planner source is recorded
+- approval still required
 
-------------------------------------------------------------------------
+---
 
 # Sprint E Result
 
-Deterministic plan execution loop implemented.
+Sprint E is complete on `main`.
 
-System now supports:
+Sprint E now means:
 
-• approved plan execution\
-• deterministic execution summaries\
-• replay protection\
-• failure envelopes\
-• execution diff capture\
-• bounded execution limits
+- controlled task-to-plan entry
+- explicit approval
+- deterministic execution
+- replay denial
+- workspace drift binding
+- summary artifacts
+- failure envelopes
+- audit-complete lifecycle records
 
-Sprint E complete.
-
-Next sprint: Sprint F -- Controlled Autonomy Mode
+Next sprint: Sprint F — Controlled Autonomy Mode

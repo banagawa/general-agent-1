@@ -1,135 +1,216 @@
 # General Agent 1
 
-A deterministic, policy-enforced autonomous software agent.
+A deterministic, policy-enforced software agent for repository work.
 
-The system is built around strict architectural invariants:
+The system preserves five core invariants:
 
 - ToolGateway is the single execution choke point
-- Deny-by-default policy enforcement
-- Workspace boundary isolation
-- Patch-only file writes
-- Append-only audit logging
+- deny-by-default policy enforcement
+- workspace boundary isolation
+- patch-only file writes
+- append-only audit logging
 
-Execution is deterministic and policy controlled.
+Execution remains fail-closed and approval-bound.
 
 ---
 
-# Architecture Overview
+# Current Operating Model
 
-Architecture
+The runtime now supports two approved front doors:
+
+1. `task.plan:<task>`
+2. `plan.submit:<json>`
+
+Both feed the same approval-bound execution path.
+
+Execution spine:
 
 Human
-→ plan.submit
-→ plan.approve
-→ plan.execute
-→ execute_plan
+→ `task.plan` or `plan.submit`
+→ `plan.approve`
+→ `plan.execute`
+→ Orchestrator
+→ AgentLoop
+→ PlanExecutor
 → execute_step
 → ToolGateway
 → PolicyEngine
 → Tool Implementation
 
-All tools execute through ToolGateway.
-
-Execution is deterministic and bound to approved plans.
-
+No tool executes outside ToolGateway.
 
 ---
 
-# Structured Planning (Sprint D — Implemented)
+# Command Surface
 
-All execution now requires a deterministic PLAN artifact.
+## 1) Planner front door
 
-Execution flow:
-
-1. Submit a structured plan
-2. Approve the plan
-3. Execute the approved plan
-
-Commands:
-
-Submit plan:
-plan.submit:<json>
-
-Approve plan:
-plan.approve:<plan_hash>
-
-Execute plan:
-plan.execute:<plan_hash>
+Use `task.plan` when the input is a human task rather than hand-authored PLAN JSON.
 
 Example:
 
-plan.submit:{"plan_id":"example","steps":[{"step_id":1,"tool":"TEST_RUN","capability":"test.run","args":{"argv":["python","--version"]}}]}
+```text
+task.plan:add a smoke test for planner denial on invalid JSON output
+```
 
-Response:
-PLAN_HASH=<hash>
-STEPS=1
-STATUS=PENDING_APPROVAL
+Behavior:
+
+- task is normalized into `TaskSpec`
+- planner generates PLAN JSON
+- generated plan is validated
+- validated plan is stored as pending
+- response returns `PLAN_HASH`, `STEPS`, and `STATUS=PENDING_APPROVAL`
+
+Planner metadata is recorded on the plan:
+
+- planner source: `deterministic` or `llm`
+- intent goal
+- success criteria
+
+## 2) Manual structured plan
+
+Use `plan.submit` when you want to submit explicit PLAN JSON.
+
+Example:
+
+```text
+plan.submit:{"plan_id":"example","steps":[{"step_id":1,"tool":"TEST_RUN","capability":"test.run","args":{"argv":["python","--version"]}}]}
+```
+
+## 3) Approval
+
+```text
+plan.approve:<plan_hash>
+```
+
+Approval writes the approved artifact and approval metadata, including:
+
+- `workspace_fingerprint`
+- `drift_check_enabled`
+- `approved_at`
+
+## 4) Execution
+
+```text
+plan.execute:<plan_hash>
+```
+
+Execution is denied unless the plan is approved and the approved workspace fingerprint still matches the current workspace.
 
 ---
 
 # Raw Execution Protection
 
-Direct execution is blocked.
+Direct execution remains blocked.
 
 Examples:
+
+```text
 cmd.run: echo hello
 update file: file.txt: content
 propose patch: file.txt: content
+```
 
 Response:
+
+```text
 DENIED: use PLAN
+```
 
 ---
 
 # Capability Model
 
-Each tool execution requires a capability token.
+Each tool execution requires a short-lived scoped capability token.
 
-Tokens are:
-- short-lived
-- scoped
-- fail-closed
+Current step-to-capability mapping:
 
-Tokens are issued automatically when executing approved plan steps.
+- `TEST_RUN` → `CMD_RUN`
+- `GIT_RUN` → `GIT_RUN`
+- `PATCH_APPLY` → `FS_WRITE_PATCH`
 
----
-
-# Audit Events
-
-PLAN_CREATED
-PLAN_APPROVED
-PLAN_EXECUTION_STARTED
-PLAN_EXECUTION_FINISHED
-PLAN_EXECUTION_DENIED
-PLAN_EXECUTION_FAILED
-
-Audit logs are append-only.
+Tokens are issued per approved step during execution.
 
 ---
 
-# Development Workflow
+# Sprint E Outcome
 
-Run agent:
+Sprint E is complete on `main`.
 
-python main.py "<task>"
+Sprint E now includes both layers:
 
-Example:
+## Deterministic execution loop
 
-python main.py "plan.submit:{...}"
+- approved-plan-only execution
+- deterministic step loop
+- bounded execution time
+- replay denial
+- execution summaries
+- failure envelopes
+
+## Planner-assisted entry
+
+- `task.plan` command surface
+- `TaskSpec` normalization
+- deterministic planner fallback
+- optional LLM planner path
+- planner remains proposal-only and cannot execute tools
+
+This keeps planning assistance inside the same approval and execution controls.
+
+---
+
+# Execution Artifacts
+
+Artifacts written under `workspace/plans`:
+
+- `plans/pending/<plan_hash>.json`
+- `plans/approved/<plan_hash>.json`
+- `plans/approved/<plan_hash>.meta.json`
+- `plans/executed/<plan_hash>.json`
+- `plans/summaries/<plan_hash>-<tx_id>.json`
+- `plans/failures/<plan_hash>-<tx_id>.json`
+
+---
+
+# Audit Lifecycle
+
+Core lifecycle events now include:
+
+- `PLAN_CREATED`
+- `PLAN_APPROVED`
+- `PLAN_EXECUTION_STARTED`
+- `PLAN_SUMMARY_RECORDED`
+- `PLAN_EXECUTION_FINISHED`
+- `PLAN_FAILURE_ENVELOPE_RECORDED`
+- `PLAN_EXECUTION_FAILED`
+- `PLAN_EXECUTION_REPLAY_DENIED`
+- `PLAN_EXECUTION_DRIFT_DENIED`
+
+Planner events:
+
+- `PLANNER_REQUESTED`
+- `PLANNER_PLAN_CREATED`
+- `PLANNER_DENIED`
+
+Audit logs remain append-only.
 
 ---
 
 # Project Status
 
 | Sprint | Status |
-|------|------|
-Sprint A | Complete |
-Sprint B | Complete |
-Sprint C | Complete |
-Sprint D | Complete |
+|---|---|
+| Sprint A | Complete |
+| Sprint B | Complete |
+| Sprint C | Complete |
+| Sprint D | Complete |
+| Sprint E | Complete |
 
 ---
 
 # Next Phase
 
-Sprint E: Deterministic development loops.
+Sprint F: Controlled Autonomy Mode
+
+That phase is not described here as merged runtime behavior.
