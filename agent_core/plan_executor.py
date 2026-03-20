@@ -6,6 +6,7 @@ from typing import Any, List, Dict
 from audit.log import log_event
 from policy.capabilities import issue_token
 
+from agent_core.deny import deny_replay, deny_workspace_drift
 from .execute_step import execute_step
 from .plan_hash import compute_plan_hash
 from .plan_validator import validate_plan
@@ -21,6 +22,12 @@ from .plan_store import (
     write_executed_marker,
     write_failure_envelope,
     write_summary,
+    transition_to_executed,
+    transition_to_in_flight_atomic,
+    transition_to_failed,
+    STATE_EXECUTED,
+    STATE_FAILED,
+    STATE_IN_FLIGHT,
 )
 from .workspace_fingerprint import compute_workspace_fingerprint
 
@@ -458,7 +465,7 @@ def execute_plan(gateway, plan_hash: str):
             },
         )
 
-        raise RuntimeError("approved plan already executed")
+        deny_replay(plan_hash)
 
     plan = load_approved_plan(plan_hash)
 
@@ -480,16 +487,19 @@ def execute_plan(gateway, plan_hash: str):
     started_at = _utc_now_iso()
     started_monotonic = time.monotonic()
 
-    write_executed_marker(
-        plan_hash,
-        {
-            "plan_hash": plan_hash,
-            "tx_id": tx_id,
-            "execution_started_at": started_at,
-            "result_status": "IN_PROGRESS",
-        },
-    )
-
+    try:
+        transition_to_in_flight_atomic(
+            plan_hash,
+            {
+                "plan_hash": plan_hash,
+                "tx_id": tx_id,
+                "state": STATE_IN_FLIGHT,
+                "execution_started_at": started_at,
+            },
+        )
+    except FileExistsError:
+        deny_replay(plan_hash)
+        
     log_event(
         "PLAN_EXECUTION_STARTED",
         {
@@ -578,4 +588,4 @@ def _verify_workspace_drift(plan_hash: str) -> None:
         },
     )
 
-    raise RuntimeError("workspace drift detected")
+    deny_workspace_drift(plan_hash, approved_fingerprint, current_fingerprint)
