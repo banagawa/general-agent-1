@@ -10,6 +10,7 @@ from agent_core.deny import deny_replay, deny_workspace_drift
 from .execute_step import execute_step
 from .plan_hash import compute_plan_hash
 from .plan_validator import validate_plan
+from agent_core.preflight import preflight_execute
 from .plan_store import (
     load_approved_plan,
     load_approved_plan_meta,
@@ -69,15 +70,21 @@ def submit_plan(plan):
 def approve_plan(plan_hash: str):
     mark_plan_approved(plan_hash)
 
+    plan = load_approved_plan(plan_hash)
+    if plan is None:
+        raise RuntimeError("approved plan not found")
+
     fingerprint = compute_workspace_fingerprint()
 
     write_approved_plan_meta(
         plan_hash,
         {
             "plan_hash": plan_hash,
+            "plan_id": plan.plan_id,
+            "approved_at": _utc_now_iso(),
+            "approval_source": "manual",
             "workspace_fingerprint": fingerprint,
             "drift_check_enabled": True,
-            "approved_at": _utc_now_iso(),
         },
     )
 
@@ -443,33 +450,15 @@ def _finalize_execution(
 
 def execute_plan(gateway, plan_hash: str):
 
-    if not plan_is_approved(plan_hash):
+    preflight = preflight_execute(
+        plan_hash,
+        load_approved_plan=load_approved_plan,
+        load_approval_meta=load_approved_plan_meta,
+        recompute_plan_hash=compute_plan_hash,
+        check_workspace_drift=_verify_workspace_drift,
+    )
 
-        log_event(
-            "PLAN_EXECUTION_DENIED",
-            {
-                "plan_hash": plan_hash,
-                "reason": "plan not approved",
-            },
-        )
-
-        raise RuntimeError("plan not approved")
-
-    if plan_has_executed(plan_hash):
-
-        log_event(
-            "PLAN_EXECUTION_REPLAY_DENIED",
-            {
-                "plan_hash": plan_hash,
-                "reason": "plan already executed",
-            },
-        )
-
-        deny_replay(plan_hash)
-
-    plan = load_approved_plan(plan_hash)
-
-    _verify_workspace_drift(plan_hash)
+    plan = preflight.plan
 
     if len(plan.steps) > MAX_STEPS_PER_EXECUTION:
 
@@ -482,7 +471,7 @@ def execute_plan(gateway, plan_hash: str):
         )
 
         raise RuntimeError("step cap exceeded")
-
+        
     tx_id = _new_tx_id(plan_hash)
     started_at = _utc_now_iso()
     started_monotonic = time.monotonic()
