@@ -22,18 +22,16 @@ def compute_workspace_fingerprint() -> str:
         if not path.is_file():
             continue
 
+        parts = path.relative_to(workspace).parts
+
+        if parts and parts[0] == "plans":
+            continue
+        if "__pycache__" in parts:
+            continue
+        if path.suffix == ".pyc":
+            continue
+
         rel = path.relative_to(workspace).as_posix()
-
-        # Ignore runtime artifacts and caches
-        if rel.startswith("plans/"):
-            continue
-        if rel.startswith("__pycache__/"):
-            continue
-        if "/__pycache__/" in rel:
-            continue
-        if rel.endswith(".pyc"):
-            continue
-
         stat = path.stat()
         file_hash = _hash_file(path)
         rows.append(f"{rel}|{stat.st_size}|{file_hash}")
