@@ -351,16 +351,21 @@ def _finalize_execution(
 
     write_summary(plan_hash, tx_id, summary)
 
-    overwrite_executed_marker(
-        plan_hash,
-        {
-            "plan_hash": plan_hash,
-            "tx_id": tx_id,
-            "execution_started_at": started_at,
-            "execution_finished_at": finished_at,
-            "result_status": status,
-        },
-    )
+    terminal_state = STATE_EXECUTED if status == "SUCCESS" else STATE_FAILED
+
+    terminal_payload = {
+        "plan_hash": plan_hash,
+        "tx_id": tx_id,
+        "state": terminal_state,
+        "execution_started_at": started_at,
+        "execution_finished_at": finished_at,
+        "result_status": status,
+    }
+
+    if terminal_state == STATE_EXECUTED:
+        transition_to_executed(plan_hash, terminal_payload)
+    else:
+        transition_to_failed(plan_hash, terminal_payload)
 
     payload = {
         "plan_hash": plan_hash,

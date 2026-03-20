@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import json
 from dataclasses import asdict
 from pathlib import Path
@@ -22,7 +23,26 @@ EXECUTED_DIR.mkdir(parents=True, exist_ok=True)
 FAILURES_DIR.mkdir(parents=True, exist_ok=True)
 SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
 
+STATE_APPROVED = "APPROVED"
+STATE_IN_FLIGHT = "IN_FLIGHT"
+STATE_EXECUTED = "EXECUTED"
+STATE_FAILED = "FAILED"
 
+ALLOWED_STATE_TRANSITIONS = {
+    STATE_APPROVED: {STATE_IN_FLIGHT},
+    STATE_IN_FLIGHT: {STATE_EXECUTED, STATE_FAILED},
+    STATE_EXECUTED: set(),
+    STATE_FAILED: set(),
+}
+
+def _assert_valid_state_transition(prior_state: str, new_state: str) -> None:
+    allowed = ALLOWED_STATE_TRANSITIONS.get(prior_state, set())
+    if new_state not in allowed:
+        raise RuntimeError(
+            f"invalid execution state transition: {prior_state} -> {new_state}"
+        )
+
+        
 def _plan_to_dict(plan: Plan) -> dict:
     return asdict(plan)
 
@@ -83,6 +103,33 @@ def failure_envelope_path(plan_hash: str, tx_id: str) -> Path:
 def summary_path(plan_hash: str, tx_id: str) -> Path:
     return SUMMARIES_DIR / f"{plan_hash}-{tx_id}.json"
 
+def transition_to_in_flight_atomic(plan_hash: str, payload: dict) -> Path:
+    state = payload.get("state")
+    if state != STATE_IN_FLIGHT:
+        raise ValueError("transition_to_in_flight_atomic requires state=IN_FLIGHT")
+
+    return acquire_execution_lock(plan_hash, payload)
+
+def _write_execution_transition(plan_hash: str, payload: dict, expected_prior_state: str) -> None:
+    current = read_execution_record(plan_hash)
+    if current is None:
+        raise RuntimeError("execution record not found")
+
+    prior_state = current.get("state")
+    _assert_valid_state_transition(prior_state, payload["state"])
+
+    overwrite_executed_marker(plan_hash, payload)
+
+def transition_to_executed(plan_hash: str, payload: dict) -> None:
+    if payload.get("state") != STATE_EXECUTED:
+        raise ValueError("transition_to_executed requires state=EXECUTED")
+    _write_execution_transition(plan_hash, payload, STATE_IN_FLIGHT)
+
+
+def transition_to_failed(plan_hash: str, payload: dict) -> None:
+    if payload.get("state") != STATE_FAILED:
+        raise ValueError("transition_to_failed requires state=FAILED")
+    _write_execution_transition(plan_hash, payload, STATE_IN_FLIGHT)
 
 def store_pending_plan(plan_hash: str, plan: Plan) -> None:
     _write_plan(pending_plan_path(plan_hash), plan)
@@ -135,6 +182,13 @@ def plan_is_approved(plan_hash: str) -> bool:
 def plan_has_executed(plan_hash: str) -> bool:
     return executed_plan_path(plan_hash).exists()
 
+def read_execution_record(plan_hash: str) -> dict | None:
+    path = executed_plan_path(plan_hash)
+    if not path.exists():
+        return None
+
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 def write_executed_marker(plan_hash: str, payload: dict) -> Path:
     path = executed_plan_path(plan_hash)
@@ -161,4 +215,25 @@ def write_failure_envelope(plan_hash: str, tx_id: str, payload: dict) -> Path:
 def write_summary(plan_hash: str, tx_id: str, payload: dict) -> Path:
     path = summary_path(plan_hash, tx_id)
     _write_json(path, payload)
+    return path
+
+def acquire_execution_lock(plan_hash: str, payload: dict) -> Path:
+    path = executed_plan_path(plan_hash)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    fd = os.open(str(path), flags)
+
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False, sort_keys=True)
+            f.flush()
+            os.fsync(f.fileno())
+    except Exception:
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
+
     return path
