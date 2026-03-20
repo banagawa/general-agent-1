@@ -147,3 +147,16 @@ Audit additions in this sprint:
 
 Outcome:
 The agent can now take a user task, turn it into a controlled plan, require explicit approval, and execute that plan deterministically with replay denial, drift checks, summaries, and failure envelopes.
+
+Post-closeout hardening completed after Sprint E added:
+
+- central preflight execution validation
+- explicit execution state transitions
+- centralized deny reasons and audit payloads
+- stricter ingress validation
+- concurrent replay coverage
+- audit reason-code verification
+- documented crash semantics for `IN_FLIGHT`
+
+This did not create a new sprint.
+It hardened the merged Sprint E execution control plane and clarified the system state that shipped after Sprint E completion.

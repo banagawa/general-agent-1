@@ -56,3 +56,25 @@ Important denial classes include:
 
 A later storage refactor may move control-plane state outside the workspace root.
 That does not change the execution-state policy above.
+
+## Preflight relationship
+
+The execution state model is entered only after preflight succeeds.
+
+Preflight is responsible for denying execution before `IN_FLIGHT` when:
+- execution request shape is invalid
+- identifiers are malformed
+- approval metadata is missing or malformed
+- canonical plan hash does not match
+- workspace drift is detected
+
+Those denials should be represented through standardized deny audit records with reason codes.
+
+## Operator note
+
+The presence of `IN_FLIGHT` without a terminal transition should be treated as a consumed approval, not as implicit permission to retry.
+
+Manual operator action is required to:
+- inspect state
+- determine whether side effects may have occurred
+- explicitly re-approve before any rerun

@@ -28,6 +28,10 @@ The system currently maintains these invariants:
 - approved-plan-only execution
 - workspace-fingerprint drift denial before execution
 - capability-scoped step execution
+- central preflight validation before execution
+- explicit execution state transitions
+- single-use execution per approval
+- reason-coded deny audit
 
 ---
 
@@ -73,8 +77,11 @@ Execution lifecycle:
 `task.plan` or `plan.submit`  
 → pending plan created  
 → `plan.approve` records approval metadata and workspace fingerprint  
-→ `plan.execute` verifies approval and drift state  
-→ deterministic step execution begins
+→ `plan.execute` runs central preflight validation  
+→ preflight validates approval metadata, hash match, and drift state  
+→ execution transitions `APPROVED -> IN_FLIGHT`  
+→ deterministic step execution begins  
+→ execution transitions to `EXECUTED` or `FAILED`
 
 Execution artifacts:
 
@@ -91,9 +98,12 @@ Execution artifacts:
 
 At approval time the system writes:
 
+- `plan_hash`
+- `plan_id`
 - `workspace_fingerprint`
 - `drift_check_enabled`
 - `approved_at`
+- `approval_source`
 
 At execution time the current workspace fingerprint is recomputed.
 
@@ -161,14 +171,14 @@ Core lifecycle events:
 - `PLAN_EXECUTION_FINISHED`
 - `PLAN_FAILURE_ENVELOPE_RECORDED`
 - `PLAN_EXECUTION_FAILED`
-- `PLAN_EXECUTION_REPLAY_DENIED`
+- `DENY`
+
+Representative deny reason codes:
+
+- `PLAN_REPLAY_DENIED`
 - `PLAN_EXECUTION_DRIFT_DENIED`
-
-Planner lifecycle events:
-
-- `PLANNER_REQUESTED`
-- `PLANNER_PLAN_CREATED`
-- `PLANNER_DENIED`
+- `PLAN_HASH_MISMATCH`
+- `INVALID_PLAN_HASH`
 
 Audit logs are append-only.
 

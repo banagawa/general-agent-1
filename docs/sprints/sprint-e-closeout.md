@@ -285,3 +285,64 @@ Sprint E now means:
 - audit-complete lifecycle records
 
 Next sprint: Sprint F — Controlled Autonomy Mode
+
+---
+
+# Post-Closeout Hardening Follow-Through
+
+After Sprint E closeout, the execution path was hardened further without weakening the governing invariants.
+
+Added after closeout:
+
+## 1) Central preflight gate
+
+Execution now passes through a single preflight path that validates:
+
+- execution request format
+- approved plan presence
+- approval metadata presence and schema
+- canonical plan hash match
+- workspace drift state
+
+## 2) Explicit execution state model
+
+Execution now uses an explicit state model:
+
+- `APPROVED`
+- `IN_FLIGHT`
+- `EXECUTED`
+- `FAILED`
+
+Allowed transitions:
+
+- `APPROVED -> IN_FLIGHT`
+- `IN_FLIGHT -> EXECUTED`
+- `IN_FLIGHT -> FAILED`
+
+All other transitions are denied.
+
+## 3) Centralized deny surface
+
+Denials are now emitted through a shared deny path with standardized reason codes and append-only audit payloads.
+
+Representative reason codes include:
+
+- `PLAN_REPLAY_DENIED`
+- `PLAN_EXECUTION_DRIFT_DENIED`
+- `PLAN_HASH_MISMATCH`
+- `INVALID_PLAN_HASH`
+
+## 4) Stricter ingress validation
+
+Execution request and approval metadata validation were tightened to reject malformed identifiers, unknown metadata fields, and invalid field types before execution begins.
+
+## 5) Concurrency and crash hardening
+
+Additional test coverage now verifies:
+
+- only one concurrent execution of the same approved plan succeeds
+- replay denial remains atomic
+- workspace drift denial emits searchable reason-coded audit records
+- approved-plan mutation after execution starts does not alter the already-started execution outcome
+
+This hardening pass preserved the same core model while making the execution control plane more explicit and test-backed.

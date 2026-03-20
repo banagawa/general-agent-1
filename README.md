@@ -85,9 +85,12 @@ plan.approve:<plan_hash>
 
 Approval writes the approved artifact and approval metadata, including:
 
+- `plan_hash`
+- `plan_id`
 - `workspace_fingerprint`
 - `drift_check_enabled`
 - `approved_at`
+- `approval_source`
 
 ## 4) Execution
 
@@ -95,7 +98,22 @@ Approval writes the approved artifact and approval metadata, including:
 plan.execute:<plan_hash>
 ```
 
-Execution is denied unless the plan is approved and the approved workspace fingerprint still matches the current workspace.
+Execution is denied unless preflight succeeds.
+
+Preflight validates:
+
+- execution request shape
+- plan identifier format
+- approved plan presence
+- approval metadata presence and schema
+- canonical plan hash match
+- workspace drift state
+
+If preflight succeeds, execution transitions through the explicit execution state model:
+
+- `APPROVED`
+- `IN_FLIGHT`
+- `EXECUTED` or `FAILED`
 
 ---
 
@@ -184,8 +202,14 @@ Core lifecycle events now include:
 - `PLAN_EXECUTION_FINISHED`
 - `PLAN_FAILURE_ENVELOPE_RECORDED`
 - `PLAN_EXECUTION_FAILED`
-- `PLAN_EXECUTION_REPLAY_DENIED`
+- `DENY`
+
+Important denial reason codes now include:
+
+- `PLAN_REPLAY_DENIED`
 - `PLAN_EXECUTION_DRIFT_DENIED`
+- `PLAN_HASH_MISMATCH`
+- `INVALID_PLAN_HASH`
 
 Planner events:
 
@@ -194,7 +218,22 @@ Planner events:
 - `PLANNER_DENIED`
 
 Audit logs remain append-only.
+---
+# Execution Hardening State
 
+Post-Sprint-E hardening now includes:
+
+- central preflight gate before execution
+- atomic replay protection
+- explicit execution state transitions
+- centralized deny reasons and audit payloads
+- stricter execution input and approval-metadata validation
+- concurrent replay coverage
+- documented crash semantics for `IN_FLIGHT`
+
+Current execution policy is single-use per approval.
+Once a plan enters `IN_FLIGHT`, that approval is consumed.
+A rerun requires explicit new approval.
 ---
 
 # Project Status
