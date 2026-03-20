@@ -2,8 +2,11 @@ from dataclasses import dataclass
 from typing import Any, Dict
 
 from agent_core.deny import deny_hash_mismatch
-from agent_core.validators import validate_plan_hash, validate_approved_meta
-
+from agent_core.validators import (
+    validate_plan_hash,
+    validate_approved_meta,
+    validate_execution_request
+    )
 
 @dataclass(frozen=True)
 class PreflightResult:
@@ -20,7 +23,7 @@ def preflight_execute(
     check_workspace_drift,
 ):
     # 1. validate input hash
-    plan_hash = validate_plan_hash(plan_hash)
+    plan_hash = validate_execution_request(plan_hash)
 
     # 2. load approved plan
     plan = load_approved_plan(plan_hash)

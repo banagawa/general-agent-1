@@ -23,32 +23,56 @@ def validate_plan_id(value: str) -> str:
 
 def validate_approved_meta(meta: Dict[str, Any]) -> None:
     if not isinstance(meta, dict):
-        raise ValueError("approval metadata must be a dict")
+        raise RuntimeError("approval metadata must be a dict")
 
-    required_fields = [
+    required_fields = {
         "plan_hash",
         "approved_at",
         "approval_source",
         "workspace_fingerprint",
         "plan_id",
-    ]
+    }
+
+    # reject unknown fields
+    unknown = set(meta.keys()) - required_fields - {"drift_check_enabled"}
+    if unknown:
+        raise RuntimeError(f"unknown approval metadata fields: {unknown}")
 
     for field in required_fields:
         if field not in meta:
-            raise ValueError(f"missing required approval metadata field: {field}")
+            raise RuntimeError(f"missing required approval metadata field: {field}")
 
-    validate_plan_hash(meta["plan_hash"])
-    validate_plan_id(meta["plan_id"])
-
-    if not isinstance(meta["approved_at"], str):
-        raise ValueError("approved_at must be a string timestamp")
-
-    if not isinstance(meta["approval_source"], str):
-        raise ValueError("approval_source must be a string")
+    if not isinstance(meta["plan_hash"], str):
+        raise RuntimeError("plan_hash must be string")
 
     if not isinstance(meta["workspace_fingerprint"], str):
-        raise ValueError("workspace_fingerprint must be a string")
+        raise RuntimeError("workspace_fingerprint must be string")
 
-    # optional flags
-    if "drift_check_enabled" in meta and not isinstance(meta["drift_check_enabled"], bool):
-        raise ValueError("drift_check_enabled must be a boolean if present")
+    if not isinstance(meta["approved_at"], str):
+        raise RuntimeError("approved_at must be string")
+
+    if not isinstance(meta["plan_id"], str):
+        raise RuntimeError("plan_id must be string")
+
+    if not isinstance(meta.get("drift_check_enabled", True), bool):
+        raise RuntimeError("drift_check_enabled must be bool")
+
+def validate_execution_request(plan_hash: str) -> str:
+    if not isinstance(plan_hash, str):
+        raise RuntimeError("invalid plan hash type")
+
+    if not plan_hash:
+        raise RuntimeError("plan hash empty")
+
+    if len(plan_hash) != 64:
+        raise RuntimeError("invalid plan hash length")
+
+    if plan_hash.lower() != plan_hash:
+        raise RuntimeError("plan hash must be lowercase")
+
+    try:
+        int(plan_hash, 16)
+    except ValueError:
+        raise RuntimeError("plan hash must be hex")
+
+    return plan_hash
