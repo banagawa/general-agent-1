@@ -1,0 +1,502 @@
+General plan.submit Constraints for General Agent 1
+===================================================
+
+Purpose
+-------
+This document captures the general, reusable constraints that apply when creating plan.submit payloads for the current version of General Agent 1.
+
+It is written to be reusable across future plans, not just Sprint F work.
+
+This document is intentionally explicit so future plan authors do not lose meaning or repeat validator failures.
+
+Scope
+-----
+This document covers:
+- how plan.submit input must be provided
+- what PATCH_APPLY means in this runtime
+- what validator constraints were observed
+- what metadata is automated versus manually supplied
+- how to safely prepare implementation plans
+
+This document does not attempt to define every possible tool schema forever.
+It captures the current, reliable rules that should be treated as source-of-truth unless the runtime changes.
+
+Core Interface Rule: plan.submit Expects Raw JSON
+-------------------------------------------------
+The plan.submit command expects raw JSON after the colon.
+
+Meaning:
+- plan.submit accepts JSON text
+- plan.submit does not accept a file path
+- plan.submit does not resolve a filename automatically
+
+Incorrect example:
+python main.py "plan.submit:my_plan.json"
+
+Why this is wrong:
+- the runtime tries to parse the literal string my_plan.json as JSON
+- that fails immediately because my_plan.json is not JSON text
+
+Correct pattern:
+python main.py "plan.submit:$(cat my_plan.json)"
+
+Any equivalent shell approach is acceptable as long as the actual command argument after plan.submit: is raw JSON text.
+
+General Planning Principle
+--------------------------
+For this runtime, a valid plan.submit payload must match the validator exactly.
+
+Do not assume:
+- the system will infer missing fields
+- the system will reinterpret high-level instructions into code edits
+- a friendly natural-language payload will be transformed into valid patch arguments
+
+Instead:
+- use the exact schema the validator expects
+- be literal
+- be explicit
+- prefer concrete file content over abstract implementation intent when using PATCH_APPLY
+
+PATCH_APPLY: Meaning In This Runtime
+------------------------------------
+In this runtime, PATCH_APPLY should be treated as a literal file-write operation.
+
+It is not a high-level “please implement this requirement” tool.
+
+It is not a semantic patch synthesizer.
+
+It does not mean:
+- figure out the right edit from my description
+- infer a diff from a goal field
+- generate code from a requirements list inside the patch step
+
+It does mean:
+- replace the specified workspace-relative file path
+- using the exact new file content provided in the step arguments
+
+Conservative runtime assumption:
+- the target path must already exist unless missing-file creation has been explicitly proven by runtime tests
+
+General Validator Constraint #1: PATCH_APPLY Capability Name
+------------------------------------------------------------
+For PATCH_APPLY, the capability name must be:
+
+patch.apply
+
+Do not use:
+fs.write_patch
+
+Required form:
+{
+  "tool": "PATCH_APPLY",
+  "capability": "patch.apply"
+}
+
+General Validator Constraint #2: PATCH_APPLY Requires Literal Args
+------------------------------------------------------------------
+PATCH_APPLY requires step args that include:
+- path
+- new_content
+
+Required meaning:
+- args.path must be a non-empty workspace-relative string
+- args.new_content must be a string
+
+Accepted structural pattern:
+{
+  "step_id": 1,
+  "tool": "PATCH_APPLY",
+  "capability": "patch.apply",
+  "args": {
+    "path": "path/from/workspace/root/to/file.py",
+    "new_content": "full file content here\n"
+  }
+}
+
+Important interpretation:
+- PATCH_APPLY is not valid with only a high-level goal
+- PATCH_APPLY is not valid with only a requirements array
+- PATCH_APPLY is not valid without a file path
+- PATCH_APPLY is not valid without explicit replacement content
+
+Therefore, future implementation plans using PATCH_APPLY must supply the exact content to be written.
+
+General Validator Constraint #3: PATCH_APPLY Paths Are Workspace-Relative
+------------------------------------------------------------------------
+For PATCH_APPLY, args.path must be interpreted as a path relative to the runtime workspace root.
+
+Important meaning:
+- do not prefix args.path with workspace/
+- do not provide an absolute filesystem path
+- do not assume the executor expects repository-root-plus-workspace in the submitted path
+- assume the runtime is already scoped to the workspace boundary
+
+Required interpretation:
+if the runtime workspace root is already bound to:
+C:\Users\<user>\Documents\general-agent-1\workspace\
+
+then this:
+{
+  "args": {
+    "path": "test_write_a.txt",
+    "new_content": "alpha\n"
+  }
+}
+
+means:
+write:
+C:\Users\<user>\Documents\general-agent-1\workspace\test_write_a.txt
+
+not:
+C:\Users\<user>\Documents\general-agent-1\workspace\workspace\test_write_a.txt
+
+Correct examples:
+- "path": "test_write_a.txt"
+- "path": "logs/run_summary.json"
+- "path": "src/module/example.py"
+
+Incorrect examples:
+- "path": "workspace/test_write_a.txt"
+- "path": "./workspace/test_write_a.txt"
+- "path": "C:\\Users\\Bryan\\Documents\\general-agent-1\\workspace\\test_write_a.txt"
+
+Safe rule:
+when authoring PATCH_APPLY steps, always write paths relative to the workspace root only.
+
+Operational consequence:
+if a plan author prefixes a path with workspace/, the runtime may incorrectly resolve the target as workspace/workspace/... and the write may fail before tests run.
+
+What PATCH_APPLY Should Be Assumed To Do
+----------------------------------------
+For planning purposes, assume this runtime treats PATCH_APPLY as:
+
+replace this file at this path with this exact content
+
+That is the safe assumption.
+
+Do not assume support for:
+- partial semantic edits inferred from English
+- automatic merging of your intent into an existing file
+- translating abstract requirements into a concrete patch during execution
+
+Metadata: What Is Automated vs What Must Be Supplied
+----------------------------------------------------
+This section is important and was missing from the earlier version of this file.
+
+There are two distinct metadata layers in the current architecture:
+
+1. Plan metadata
+2. Approval metadata
+
+These are not the same thing.
+
+Plan Metadata
+-------------
+Plan metadata is metadata that lives inside the plan object itself.
+
+What is known:
+- the codebase supports plan-level metadata
+- Plan includes a metadata field
+- plan parsing and reading preserve metadata
+- task.plan attaches metadata before submitting the plan
+- execution summaries and failure artifacts can draw intent information from plan metadata
+
+Examples of plan metadata already used by the existing architecture include:
+- planner source
+- intent goal
+- intent success criteria
+
+Important meaning:
+- plan metadata is part of the submitted plan object
+- plan metadata is useful for traceability and later summaries
+- plan metadata may be important for understanding why a plan exists and what success means
+
+What is not fully validated from our observed command failures:
+- whether manual plan.submit requires plan metadata
+- whether all arbitrary metadata keys are accepted in manual plan.submit
+- whether there is a stricter validator shape for metadata than the architecture suggests
+
+Therefore:
+- plan metadata is supported by the architecture
+- but manual metadata requirements were not proven by the specific validator errors we observed
+
+Approval Metadata
+-----------------
+Approval metadata is separate from the submitted plan body.
+
+Approval metadata is written during the approval process.
+
+Examples include:
+- plan_hash
+- plan_id
+- workspace_fingerprint
+- drift_check_enabled
+- approved_at
+- approval_source
+
+Important meaning:
+- approval metadata is automated by the approval process
+- it is not something the plan author needs to manually inject to get approval metadata recorded
+- approval metadata should be treated as runtime-generated process metadata, not author-supplied implementation metadata
+
+Safe Rule For Future Plans
+--------------------------
+Use this rule:
+
+- If you are authoring a manual plan.submit payload, assume that plan metadata may be included if helpful, but do not assume approval metadata must be authored manually.
+- Approval metadata is handled by the system during approval.
+- Plan metadata is the author-controlled metadata layer.
+- Approval metadata is the runtime-controlled metadata layer.
+
+Conservative Recommended Plan Metadata Shape
+--------------------------------------------
+If future manual plans want to carry useful intent context, the safest conservative metadata pattern is:
+
+"metadata": {
+  "source": "manual_plan_submit",
+  "intent": {
+    "goal": "clear statement of implementation goal",
+    "success_criteria": [
+      "criterion one",
+      "criterion two"
+    ]
+  }
+}
+
+Important caution:
+- this metadata pattern is architecturally aligned
+- but exact validator acceptance for every possible metadata shape has not been proven solely from the errors we observed
+- therefore use conservative, simple metadata structures
+
+Planning Consequence
+--------------------
+Any implementation-oriented plan using PATCH_APPLY should be written as a literal content plan.
+
+That means:
+- every file to create or modify must be named explicitly
+- every file must have explicit full replacement content in new_content
+- the plan author is responsible for knowing the intended file contents before submission
+
+In addition:
+- if useful, the plan author may include simple plan metadata for intent and source tracking
+- but the plan author should not try to manually recreate runtime approval metadata inside the plan body
+
+Safe Planning Rule For New Files
+--------------------------------
+Do not assume PATCH_APPLY will create a missing file.
+
+Observed safe assumption:
+- PATCH_APPLY reliably replaces the content of a target file when that file already exists
+- PATCH_APPLY may fail with a filesystem error if the target file does not already exist
+
+Why:
+- current validator rules prove that PATCH_APPLY requires args.path and args.new_content
+- current runtime tests only prove successful replacement of an already existing file
+- missing-file creation behavior has not been proven as a supported runtime guarantee
+
+Therefore:
+before using PATCH_APPLY on a brand new file path, first verify that the runtime explicitly supports missing-file creation.
+Until that behavior is proven, treat PATCH_APPLY as an existing-file replacement tool, not a file-creation tool.
+
+Conservative safe pattern:
+- create the target file through an explicitly supported file-creation path, if one exists
+- or pre-create an empty/stub file outside the plan if that is part of the approved/manual setup
+- then use PATCH_APPLY to replace the file contents deterministically
+
+Correct planning assumption:
+PATCH_APPLY = replace exact contents at an already-resolved workspace-relative path
+
+Do not assume:
+PATCH_APPLY = create parent directories and create missing files automatically
+
+Safe Planning Rule For Existing Files
+-------------------------------------
+Editing existing files is riskier.
+
+Why:
+- PATCH_APPLY requires exact replacement content
+- if the current file content is not known precisely, a replacement can accidentally remove working code
+- there is no basis to assume the runtime will merge or preserve untouched sections automatically
+
+Therefore:
+do not prepare a PATCH_APPLY step for an existing file unless the current content of that file is already known exactly and the desired replacement content is also known exactly.
+
+Practical consequence:
+before creating a plan that edits existing files, first capture the current file contents.
+
+What Not To Put Inside PATCH_APPLY
+----------------------------------
+Do not assume these fields are sufficient for PATCH_APPLY:
+- goal
+- requirements
+- prose instructions
+- implementation notes
+- file-change descriptions without path and new_content
+
+Those may be useful for human planning notes, but they are not enough for validator-compliant PATCH_APPLY execution in the current runtime.
+
+Reusable Baseline Shape For Implementation Plans
+------------------------------------------------
+The safest general implementation plan pattern is:
+
+{
+  "plan_id": "descriptive-plan-id",
+  "metadata": {
+    "source": "manual_plan_submit",
+    "intent": {
+      "goal": "clear statement of implementation goal",
+      "success_criteria": [
+        "criterion one",
+        "criterion two"
+      ]
+    }
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "tool": "PATCH_APPLY",
+      "capability": "patch.apply",
+      "args": {
+        "path": "path/to/file.py",
+        "new_content": "FULL FILE CONTENT HERE\n"
+      }
+    },
+    {
+      "step_id": 2,
+      "tool": "TEST_RUN",
+      "capability": "test.run",
+      "args": {
+        "argv": ["pytest", "-q"],
+        "timeout_seconds": 120
+      }
+    }
+  ]
+}
+
+This should be treated as the baseline structural model for implementation plans in the current runtime.
+
+General Guidance For TEST_RUN
+-----------------------------
+TEST_RUN is a separate tool step from PATCH_APPLY.
+
+When used:
+- capability should match the runtime's expected test capability
+- args should contain the explicit command vector
+- timeout should be explicit
+
+Safe pattern:
+{
+  "step_id": 2,
+  "tool": "TEST_RUN",
+  "capability": "test.run",
+  "args": {
+    "argv": ["pytest", "-q"],
+    "timeout_seconds": 120
+  }
+}
+
+General Payload Authoring Rules
+-------------------------------
+When writing a new plan.submit payload:
+1. choose a clear plan_id
+2. make every step explicit
+3. use the exact expected capability names
+4. for every PATCH_APPLY step, provide path and full new_content
+5. for every TEST_RUN step, provide explicit argv and timeout
+6. do not rely on implicit transformations
+7. do not rely on natural-language patch synthesis
+8. include simple plan metadata when it improves traceability, but keep it conservative
+9. do not manually duplicate approval metadata fields inside the submitted plan unless the runtime explicitly requires it
+
+Operational Distinction: Plan Creation vs Approval vs Execution
+---------------------------------------------------------------
+These states are distinct and should not be confused.
+
+State 1: plan submission
+- JSON is parsed
+- plan is validated
+- if valid, a pending plan is created
+
+State 2: approval
+- the pending plan becomes approved
+- approval writes approval metadata
+- approval does not itself implement code changes
+
+State 3: execution
+- the approved plan is executed
+- only execution can actually write files or run tests
+
+State 4: outcome
+- execution may succeed
+- execution may fail
+- execution may be denied
+- execution may produce failure artifacts instead of success
+
+Important meaning:
+a valid plan is not the same thing as a successful implementation.
+
+General Reusable Rules
+----------------------
+Treat the following as durable general rules for the current runtime:
+
+1. plan.submit expects raw JSON, not a filename
+2. validator compliance matters more than human-friendly phrasing
+3. PATCH_APPLY must use capability patch.apply
+4. PATCH_APPLY must include args.path and args.new_content
+5. PATCH_APPLY should be treated as literal file replacement
+6. do not assume PATCH_APPLY can create missing files; safest proven use is replacing an existing file
+7. existing-file edit plans should only be written after capturing exact current file contents
+8. TEST_RUN steps should use explicit argv and timeout values
+9. plan metadata and approval metadata are different layers
+10. approval metadata is generated by the approval process
+11. plan metadata may be author-supplied for intent and traceability
+12. successful validation does not guarantee successful implementation
+
+Common Failure Patterns To Avoid
+--------------------------------
+Do not repeat these patterns:
+
+Failure pattern 1:
+passing a file path directly to plan.submit instead of raw JSON text
+
+Failure pattern 2:
+using the wrong PATCH_APPLY capability name, such as fs.write_patch
+
+Failure pattern 3:
+omitting args.path in a PATCH_APPLY step
+
+Failure pattern 4:
+omitting args.new_content in a PATCH_APPLY step
+
+Failure pattern 5:
+assuming PATCH_APPLY will translate a goal or requirements list into code changes
+
+Failure pattern 6:
+attempting to modify an existing file without first capturing the exact current file contents
+
+Failure pattern 7:
+confusing plan metadata with approval metadata
+
+Failure pattern 8:
+assuming approval metadata must be authored manually in the submitted plan
+
+How To Use This Document
+------------------------
+Use this document before creating any future implementation plan.
+
+It is especially useful when planning:
+- new files
+- code changes via PATCH_APPLY
+- test runs after code changes
+- phased multi-plan implementation work
+- traceable plan metadata
+
+If a future plan conflicts with these rules, the safest assumption is:
+- the plan is likely invalid, or
+- the plan is structurally unsafe for this runtime
+
+Change Management Note
+----------------------
+If the runtime validator or tool schema changes in the future, this document may need to be updated.
+
+Until there is evidence of such a change, this document should be treated as the reusable baseline for creating plan.submit payloads in the current version of General Agent 1.
