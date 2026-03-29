@@ -254,3 +254,54 @@ class ToolGateway:
             },
         )
         return {"ok": True, **res}
+
+    def create_file(
+        self,
+        path: Path,
+        content: str,
+        cap_token_id: Optional[str] = None,
+    ):
+        assert_security_invariants(direct_tool_bypass=False)
+
+        vr = validate_token(
+            token_id=cap_token_id,
+            action="FS_CREATE_FILE",
+            context={"path": str(path)},
+        )
+
+        if not vr.allowed:
+            log_event(
+                "FILE_CREATE_DENIED",
+                {
+                    "path": str(path),
+                    "token_id": vr.token_id,
+                    "decision": "deny",
+                    "reason": vr.reason,
+                },
+            )
+            raise PermissionError(f"Create denied: {vr.reason}")
+
+        if not self.policy.is_allowed("FS_CREATE_FILE", path):
+            log_event(
+                "FILE_CREATE_DENIED",
+                {
+                    "path": str(path),
+                    "token_id": vr.token_id,
+                    "decision": "deny",
+                    "reason": "policy",
+                },
+            )
+            raise PermissionError(f"Create denied: {path}")
+
+        result = self.fs.create_file(path, content)
+
+        log_event(
+            "FILE_CREATE_EXECUTED",
+            {
+                "path": str(path),
+                "token_id": vr.token_id,
+                "decision": "allow",
+            },
+        )
+
+        return result

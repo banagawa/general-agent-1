@@ -2,7 +2,7 @@ from pathlib import Path
 import difflib
 
 MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024  # 2MB
-
+MAX_CREATE_SIZE_BYTES = 64 * 1024  # 64 KB
 
 class FileSystemTools:
     def search(self, root: Path, query: str, max_results: int = 50):
@@ -61,3 +61,35 @@ class FileSystemTools:
         except Exception as e:
             return f"[ERROR applying patch: {e}]"
 
+    def create_file(self, path: Path, content: str) -> str:
+        """
+        Create a new text file atomically.
+
+        Rules:
+        - fail if target already exists
+        - fail if parent directory does not exist
+        - fail if content is not text
+        - fail if content exceeds size cap
+        """
+
+        if not isinstance(content, str):
+            raise ValueError("content must be string")
+
+        encoded = content.encode("utf-8")
+        if len(encoded) > MAX_CREATE_SIZE_BYTES:
+            raise ValueError("file too large")
+
+        parent = path.parent
+        if not parent.exists():
+            raise ValueError("parent directory does not exist")
+
+        if path.exists():
+            raise ValueError("file already exists")
+
+        try:
+            with open(path, "x", encoding="utf-8") as f:
+                f.write(content)
+        except FileExistsError:
+            raise ValueError("file already exists")
+
+        return str(path)

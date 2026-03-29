@@ -7,7 +7,9 @@ The system preserves five core invariants:
 - ToolGateway is the single execution choke point
 - deny-by-default policy enforcement
 - workspace boundary isolation
-- patch-only file writes
+- typed, reviewable file mutations:
+  - PATCH_APPLY (existing-file modification only)
+  - FILE_CREATE (new-file creation only)
 - append-only audit logging
 
 Execution remains fail-closed and approval-bound.
@@ -146,7 +148,7 @@ Current step-to-capability mapping:
 - `TEST_RUN` → `CMD_RUN`
 - `GIT_RUN` → `GIT_RUN`
 - `PATCH_APPLY` → `FS_WRITE_PATCH`
-
+- `FILE_CREATE ` → `FS_CREATE_FILE`
 Tokens are issued per approved step during execution.
 
 ---

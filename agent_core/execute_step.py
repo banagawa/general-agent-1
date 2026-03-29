@@ -25,6 +25,14 @@ def execute_step(gateway, step):
             new_content=step.args["new_content"],
             cap_token_id=step.args.get("cap_token_id"),
         )
+    if step.tool == "FILE_CREATE":
+        workspace_root = get_workspace_root()
+        path = (workspace_root / step.args["path"]).resolve()
+        return gateway.create_file(
+            path=path,
+            content=step.args["content"],
+            cap_token_id=step.args.get("cap_token_id"),
+        )
 
     if step.tool == "TEST_RUN":
         return gateway.test_run(

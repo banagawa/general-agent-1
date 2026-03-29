@@ -307,7 +307,8 @@ Correct planning assumption:
 PATCH_APPLY = replace exact contents at an already-resolved workspace-relative path
 
 Do not assume:
-PATCH_APPLY = create parent directories and create missing files automatically
+PATCH_APPLY = replace exact contents at an already-existing workspace-relative path
+FILE_CREATE = create a new file at a workspace-relative path (no overwrite, no implicit mkdir)
 
 Safe Planning Rule For Existing Files
 -------------------------------------
@@ -479,6 +480,20 @@ confusing plan metadata with approval metadata
 
 Failure pattern 8:
 assuming approval metadata must be authored manually in the submitted plan
+
+Mutation Model Invariants
+-------------------------
+- PATCH_APPLY:
+  - requires target file to already exist
+  - cannot create new files
+  - cannot create parent directories
+
+- FILE_CREATE:
+  - fails if target file already exists
+  - fails if parent directory does not exist
+  - performs atomic file creation only
+
+- No operation implicitly converts between create and modify
 
 How To Use This Document
 ------------------------

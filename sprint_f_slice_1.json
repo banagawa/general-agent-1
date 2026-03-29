@@ -1,0 +1,88 @@
+{
+  "plan_id": "sprint-f-assisted-autonomy-controller-v1",
+  "steps": [
+    {
+      "step_id": 1,
+      "tool": "PATCH_APPLY",
+      "capability": "patch.apply",
+      "args": {
+        "goal": "Add Sprint F autonomy controller module that wraps the existing TaskSpec -> planner -> pending-plan path without bypassing approval or execution controls.",
+        "requirements": [
+          "Create agent_core/autonomy.py.",
+          "Define AutonomyMode with MANUAL, ASSISTED, BOUNDED_AUTONOMOUS.",
+          "Define AutonomyStopReason with at least AWAITING_APPROVAL, BUDGET_EXHAUSTED, SUCCESS_CRITERIA_MET, DENIED, VIOLATION, ERROR, DISABLED.",
+          "Define AutonomyBudget dataclass with max_cycles, max_runtime_seconds, max_mutation_steps, cycles_used, runtime_seconds_used, mutation_steps_used.",
+          "Define AutonomyCycleResult dataclass with mode, task_goal, cycle_index, plan_hash, status, stop_reason, budget_remaining.",
+          "Implement pure budget helpers that validate counters and return fail-closed denials when exhausted or malformed.",
+          "Implement a single-cycle controller function that accepts TaskSpec, mode, budget, and planner dependencies.",
+          "The controller must create at most one new pending plan per invocation.",
+          "The controller must never execute tools directly.",
+          "The controller must reuse the existing planner path and validated pending-plan submission path rather than duplicating plan creation logic.",
+          "MANUAL and ASSISTED must stop at pending-approval boundary and return stop_reason AWAITING_APPROVAL.",
+          "BOUNDED_AUTONOMOUS must fail closed for now unless an explicit feature flag is enabled.",
+          "If BOUNDED_AUTONOMOUS is gated off, return a denied/disabled result rather than silently degrading behavior.",
+          "Keep implementation deterministic except where existing optional planner selection already exists."
+        ]
+      }
+    },
+    {
+      "step_id": 2,
+      "tool": "PATCH_APPLY",
+      "capability": "patch.apply",
+      "args": {
+        "goal": "Expose Sprint F slice through the command surface while preserving all current commands and their fail-closed semantics.",
+        "requirements": [
+          "Update agent_core/loop.py to add task.autonomy:<json> command handling.",
+          "Update main.py command parsing to allow task.autonomy.",
+          "Payload must require task and mode fields.",
+          "Optional budget object may include max_cycles, max_runtime_seconds, and max_mutation_steps.",
+          "Malformed or empty payload must return DENIED with explicit invalid payload wording.",
+          "Normalize task using the existing TaskSpec path already used by task.plan.",
+          "Reuse existing planner selection behavior so planner metadata remains aligned with current task.plan behavior.",
+          "Return a compact structured response containing MODE, PLAN_HASH when present, STATUS, STOP_REASON, and CYCLES_USED.",
+          "Do not change existing behavior for task.plan, plan.submit, plan.approve, or plan.execute.",
+          "Do not introduce any direct execution path from task.autonomy."
+        ]
+      }
+    },
+    {
+      "step_id": 3,
+      "tool": "PATCH_APPLY",
+      "capability": "patch.apply",
+      "args": {
+        "goal": "Add tests that lock Sprint F slice 1 behavior to the current approval-bound architecture.",
+        "requirements": [
+          "Create tests/test_autonomy_controller.py.",
+          "Test MANUAL mode creates exactly one pending plan and returns AWAITING_APPROVAL.",
+          "Test ASSISTED mode creates exactly one pending plan and returns AWAITING_APPROVAL.",
+          "Test exhausted cycle budget is denied before any plan is created.",
+          "Test malformed task.autonomy payload is denied.",
+          "Test missing mode is denied.",
+          "Test missing task is denied.",
+          "Test BOUNDED_AUTONOMOUS is disabled/fail-closed by default.",
+          "Test controller does not invoke plan execution directly.",
+          "Test controller preserves existing single-use approval model by stopping before execute.",
+          "Where helpful, assert plan metadata still records planner source and intent through existing flow."
+        ]
+      }
+    },
+    {
+      "step_id": 4,
+      "tool": "TEST_RUN",
+      "capability": "test.run",
+      "args": {
+        "argv": ["pytest", "-q", "tests/test_autonomy_controller.py"],
+        "timeout_seconds": 120
+      }
+    },
+    {
+      "step_id": 5,
+      "tool": "TEST_RUN",
+      "capability": "test.run",
+      "args": {
+        "argv": ["pytest", "-q"],
+        "timeout_seconds": 240
+      }
+    }
+  ]
+}
