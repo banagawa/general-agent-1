@@ -6,12 +6,14 @@ ALLOWED_TOOLS = {
     "GIT_RUN",
     "PATCH_APPLY",
     "TEST_RUN",
+    "FILE_CREATE",
 }
 
 EXPECTED_CAPABILITY_BY_TOOL = {
     "GIT_RUN": "git.run",
     "PATCH_APPLY": "patch.apply",
     "TEST_RUN": "test.run",
+    "FILE_CREATE": "file.create",
 }
 
 
@@ -58,6 +60,17 @@ def _validate_test_run(step: ToolStep) -> None:
     _require_argv(step.args, "TEST_RUN")
     _require_timeout_if_present(step.args, "TEST_RUN")
 
+def _validate_file_create(step: ToolStep) -> None:
+    path = step.args.get("path")
+    content = step.args.get("content")
+
+    _require_non_empty_string(path, "FILE_CREATE args.path")
+
+    if not isinstance(content, str):
+        raise ValueError("FILE_CREATE args.content must be string")
+
+    if "argv" in step.args:
+        raise ValueError("FILE_CREATE must not include args.argv")
 
 def validate_plan(plan: Plan) -> None:
     if not isinstance(plan, Plan):
@@ -111,6 +124,8 @@ def validate_plan(plan: Plan) -> None:
             _validate_git_run(step)
         elif step.tool == "PATCH_APPLY":
             _validate_patch_apply(step)
+        elif step.tool == "FILE_CREATE":
+            _validate_file_create(step)
         elif step.tool == "TEST_RUN":
             _validate_test_run(step)
         else:

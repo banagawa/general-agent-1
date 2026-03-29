@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 import pytest
+from agent_core.plan_schema import Plan, ToolStep
+from agent_core.plan_validator import validate_plan
+
 
 
 def _set_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
@@ -135,3 +138,81 @@ def test_validate_approved_meta_rejects_bad_drift_flag_type(
 
     with pytest.raises(RuntimeError, match="drift_check_enabled must be bool"):
         validate_approved_meta(meta)
+def test_validate_plan_accepts_file_create():
+    plan = Plan(
+        plan_id="p1",
+        steps=[
+            ToolStep(
+                step_id=1,
+                tool="FILE_CREATE",
+                args={"path": "docs/test.txt", "content": "hello"},
+                capability="file.create",
+            )
+        ],
+    )
+    validate_plan(plan)
+
+
+def test_validate_plan_rejects_file_create_argv():
+    plan = Plan(
+        plan_id="p1",
+        steps=[
+            ToolStep(
+                step_id=1,
+                tool="FILE_CREATE",
+                args={"path": "docs/test.txt", "content": "hello", "argv": ["bad"]},
+                capability="file.create",
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError, match="FILE_CREATE must not include args.argv"):
+        validate_plan(plan)
+
+def test_validate_plan_rejects_file_create_missing_path():
+    plan = Plan(
+        plan_id="p1",
+        steps=[
+            ToolStep(
+                step_id=1,
+                tool="FILE_CREATE",
+                args={"content": "hello"},
+                capability="file.create",
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError):
+        validate_plan(plan)
+
+def test_validate_plan_rejects_file_create_missing_content():
+    plan = Plan(
+        plan_id="p1",
+        steps=[
+            ToolStep(
+                step_id=1,
+                tool="FILE_CREATE",
+                args={"path": "docs/test.txt"},
+                capability="file.create",
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError):
+        validate_plan(plan)
+
+def test_validate_plan_rejects_file_create_wrong_capability():
+    plan = Plan(
+        plan_id="p1",
+        steps=[
+            ToolStep(
+                step_id=1,
+                tool="FILE_CREATE",
+                args={"path": "docs/test.txt", "content": "hello"},
+                capability="patch.apply",
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError):
+        validate_plan(plan)

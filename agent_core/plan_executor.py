@@ -36,6 +36,7 @@ TOKEN_ACTION_BY_TOOL = {
     "TEST_RUN": "CMD_RUN",
     "GIT_RUN": "GIT_RUN",
     "PATCH_APPLY": "FS_WRITE_PATCH",
+    "FILE_CREATE": "FS_CREATE_FILE",
 }
 
 MAX_STEPS_PER_EXECUTION = 25
@@ -137,17 +138,18 @@ def _issue_step_token(step):
 
     scope = {}
 
-    if step.tool == "PATCH_APPLY":
+    if step.tool in {"PATCH_APPLY", "FILE_CREATE"}:
         from sandbox.mounts import get_workspace_root
 
         requested_path = step.args["path"]
         workspace_root = get_workspace_root()
         resolved_path = (workspace_root / requested_path).resolve()
+        scope = {"path": str(resolved_path)}
 
         try:
             resolved_path.relative_to(workspace_root.resolve())
         except ValueError as e:
-            raise ValueError("patch path escapes workspace") from e
+            raise ValueError("file path escapes workspace") from e
 
         scope = {"path": str(resolved_path)}
 
@@ -176,6 +178,12 @@ def _result_timed_out(result: dict) -> bool:
 
 
 def _changed_paths_from_results(results: list[dict]) -> list[str]:
+    '''
+    NOTE:
+    This function returns ONLY paths modified via PATCH_APPLY.
+    It does NOT include FILE_CREATE paths.
+    FILE_CREATE paths are handled separately via _created_paths_from_results.
+    '''
     changed = []
 
     for item in results:
@@ -282,6 +290,8 @@ def _build_summary(
 ) -> Dict:
 
     intent = _intent_from_plan(plan)
+    created = _created_paths_from_results(results)
+    modified = _changed_paths_from_results(results)
     summary = {
         "plan_hash": plan_hash,
         "tx_id": tx_id,
@@ -291,7 +301,9 @@ def _build_summary(
         "steps_attempted": len(results),
         "steps_completed": len(results),
         "test_summary": _test_summary_from_results(results),
-        "changed_paths": _changed_paths_from_results(results),
+        "created_paths": created,
+        "modified_paths": modified,
+        "changed_paths": created + [p for p in modified if p not in created],
         "requires_new_approval": status != "SUCCESS",
         "intent": intent,
     }
@@ -324,6 +336,9 @@ def _build_failure_envelope(
         exit_code = _result_exit_code(result)
         timed_out = _result_timed_out(result)
 
+    created = _created_paths_from_results(results)
+    modified = _changed_paths_from_results(results)
+
     return {
         "plan_hash": plan_hash,
         "tx_id": tx_id,
@@ -333,7 +348,9 @@ def _build_failure_envelope(
         "tool": failing_tool,
         "exit_code": exit_code,
         "timed_out": timed_out,
-        "changed_paths": _changed_paths_from_results(results),
+        "created_paths": created,
+        "modified_paths": modified,
+        "changed_paths": created + [p for p in modified if p not in created],
         "error": str(error),
         "test_summary": _test_summary_from_results(results),
         "requires_new_approval": True,
@@ -443,6 +460,22 @@ def _finalize_execution(
     payload["failure_envelope"] = envelope
     return payload
 
+def _created_paths_from_results(results: list[dict]) -> list[str]:
+    created = []
+
+    for item in results:
+        if item["tool"] != "FILE_CREATE":
+            continue
+
+        result = item.get("result")
+        if isinstance(result, str) and result.startswith("[ERROR"):
+            continue
+
+        path = item.get("path")
+        if isinstance(path, str) and path not in created:
+            created.append(path)
+
+    return created
 
 # -----------------------------------------------------------------------------
 # Execution
@@ -520,7 +553,7 @@ def execute_plan(gateway, plan_hash: str):
                 "result": result,
             }
 
-            if step.tool == "PATCH_APPLY":
+            if step.tool in {"PATCH_APPLY", "FILE_CREATE"}:
                 record["path"] = step.args["path"]
 
             results.append(record)
@@ -556,6 +589,7 @@ def execute_plan(gateway, plan_hash: str):
             started_at=started_at,
             error=e,
         )
+        
 def _verify_workspace_drift(plan_hash: str) -> None:
     meta = load_approved_plan_meta(plan_hash)
 
@@ -578,3 +612,5 @@ def _verify_workspace_drift(plan_hash: str) -> None:
     )
 
     deny_workspace_drift(plan_hash, approved_fingerprint, current_fingerprint)
+
+

@@ -23,7 +23,9 @@ The system currently maintains these invariants:
 - ToolGateway is the single execution choke point
 - deny-by-default enforcement
 - workspace boundary isolation
-- patch-only file writes
+- typed file mutation model:
+  - PATCH_APPLY modifies existing files only
+  - FILE_CREATE creates new files only
 - append-only audit logging
 - approved-plan-only execution
 - workspace-fingerprint drift denial before execution
