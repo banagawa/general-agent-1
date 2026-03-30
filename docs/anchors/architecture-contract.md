@@ -1,22 +1,34 @@
 # Architecture Contract
 
-This document defines the non-negotiable architectural invariants of the General Agent system.
+Status: Anchor
 
-If future refactors, planner integrations, or convenience features conflict with this document, this document wins.
+This file describes the core execution contract that merged runtime behavior must preserve.
+
+If another document conflicts with this file, this file wins.
 
 ---
 
-## Core Enforcement Spine
+## Core Spine
 
-All tool access must flow through:
+All execution must follow:
 
-Orchestrator → AgentLoop → PlanExecutor → execute_step → ToolGateway → PolicyEngine → Tool Implementation
+Human
+→ `task.plan` or `plan.submit`
+→ `plan.approve`
+→ `plan.execute`
+→ Orchestrator
+→ AgentLoop
+→ PlanExecutor
+→ execute_step
+→ ToolGateway
+→ PolicyEngine
+→ Tool Implementation
 
 Planner entry does not change that spine.
 
-`task.plan` may create a pending plan.  
-`plan.submit` may create a pending plan.  
-Only `plan.execute` may run steps.  
+`task.plan` may create a pending plan.
+`plan.submit` may create a pending plan.
+Only `plan.execute` may run steps.
 All step execution must still pass through ToolGateway.
 
 No tool may be invoked directly from the loop, planner, or orchestrator.
@@ -26,63 +38,86 @@ No tool may be invoked directly from the loop, planner, or orchestrator.
 ## Security Model
 
 ### 1. Deny-by-default
-
 - all actions are denied unless explicitly allowed
 - `PolicyEngine.is_allowed()` is the execution gate
 - unexpected states fail closed
 
 ### 2. Workspace boundary
-
 - all file operations must remain within `WORKSPACE_ROOT`
 - paths must be canonicalized with `resolve()`
 - boundary enforcement must use `relative_to()` or equivalent
 - escape attempts must fail closed
 
 ### 3. No shell passthrough
-
 - subprocess execution must use `shell=False`
 - commands must be passed as argv lists only
 - single-string shell commands are forbidden
 
-### 4. Patch-only writes
-
+### 4. Typed patch-only mutation
 - no silent direct overwrite path
-- file mutation must remain diff-visible
+- mutation must remain diff-visible
 - mutation must stay scoped to approved tool behavior
+- `PATCH_APPLY` and `PATCH_EDIT` remain separate typed operations
 
 ### 5. Explicit approval before execution
-
 - mutation-capable execution requires a plan artifact
 - the plan must be approved before execution
 - raw execution commands remain blocked
 - planner-generated plans are not self-approving
 
 ### 6. Approval binds to workspace state
-
 - approval records a `workspace_fingerprint`
 - execution verifies the current workspace fingerprint before the run starts
 - fingerprint mismatch must deny execution
 - drift denial must require a new approval cycle
 
 ### 7. Capability-scoped execution
-
 - each executable step receives a short-lived scoped token
 - token scope must match the tool and step being executed
 - capability checks must remain fail-closed
 
 ### 8. Audit everything
-
 - all major lifecycle actions must emit audit events
 - allow and deny paths must both be logged
 - summary and failure recording must be logged
 - audit remains append-only
 
 ### 9. Fail-closed design
-
 If anything unexpected occurs:
 - deny
 - log
 - do not partially bypass controls
+
+---
+
+## Typed Mutation Contract
+
+### PATCH_APPLY
+- whole-file replacement only
+- target file must already exist
+- exact-path scoped token
+- audited
+
+### PATCH_EDIT
+- anchored exact-text replacement only
+- target file must already exist
+- exact `old_text` to exact `new_text`
+- optional 1-based `occurrence`
+- optional `expected_file_sha256_before`
+- exact-path scoped token
+- audited
+
+`PATCH_EDIT` must not become:
+- regex editing
+- fuzzy matching
+- AST patching
+- line-number-only targeting
+- silent fallback to whole-file rewrite
+
+Multi-edit PATCH_EDIT is atomic:
+- edits apply in declared order to in-memory content
+- any failed edit denies the whole step
+- nothing is written on failure
 
 ---
 
@@ -141,17 +176,3 @@ Execution denials include at least:
 - no network connector execution path in the runtime loop
 - no self-escalating permissions
 - no planner-driven approval bypass
-
----
-
-## Sprint E Contract Update
-
-Sprint E is complete and extends the contract in two ways without weakening it:
-
-1. deterministic execution artifacts are now first-class
-2. planner-assisted plan creation exists through `task.plan`
-
-The security boundary is unchanged:
-planning may propose  
-approval must authorize  
-execution must remain ToolGateway-mediated

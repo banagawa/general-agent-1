@@ -37,6 +37,8 @@ TOKEN_ACTION_BY_TOOL = {
     "GIT_RUN": "GIT_RUN",
     "PATCH_APPLY": "FS_WRITE_PATCH",
     "FILE_CREATE": "FS_CREATE_FILE",
+    "PATCH_EDIT": "FS_EDIT_PATCH",
+
 }
 
 MAX_STEPS_PER_EXECUTION = 25
@@ -138,7 +140,9 @@ def _issue_step_token(step):
 
     scope = {}
 
-    if step.tool in {"PATCH_APPLY", "FILE_CREATE"}:
+
+    if step.tool in {"PATCH_APPLY", "FILE_CREATE", "PATCH_EDIT"}:
+
         from sandbox.mounts import get_workspace_root
 
         requested_path = step.args["path"]
@@ -176,6 +180,9 @@ def _result_exit_code(result: dict) -> int | None:
 def _result_timed_out(result: dict) -> bool:
     return bool(isinstance(result, dict) and result.get("timed_out") is True)
 
+def _result_denied(result: dict) -> bool:
+    return bool(isinstance(result, dict) and result.get("denied") is True)
+
 
 def _changed_paths_from_results(results: list[dict]) -> list[str]:
     '''
@@ -184,6 +191,11 @@ def _changed_paths_from_results(results: list[dict]) -> list[str]:
     It does NOT include FILE_CREATE paths.
     FILE_CREATE paths are handled separately via _created_paths_from_results.
     '''
+
+def _result_ok(result: dict) -> bool:
+    return bool(isinstance(result, dict) and result.get("ok") is True)
+
+def _patch_apply_paths_from_results(results: list[dict]) -> list[str]:
     changed = []
 
     for item in results:
@@ -200,6 +212,43 @@ def _changed_paths_from_results(results: list[dict]) -> list[str]:
 
     return changed
 
+
+def _patch_edit_paths_from_results(results: list[dict]) -> list[str]:
+    changed = []
+
+    for item in results:
+        if item["tool"] != "PATCH_EDIT":
+            continue
+
+        result = item.get("result")
+        if not isinstance(result, dict):
+            continue
+        if result.get("denied") is True:
+            continue
+        if result.get("ok") is not True:
+            continue
+        if result.get("changed") is not True:
+            continue
+
+        path = item.get("path")
+        if isinstance(path, str) and path not in changed:
+            changed.append(path)
+
+    return changed
+
+
+def _changed_paths_from_results(results: list[dict]) -> list[str]:
+    changed = []
+
+    for path in _patch_apply_paths_from_results(results):
+        if path not in changed:
+            changed.append(path)
+
+    for path in _patch_edit_paths_from_results(results):
+        if path not in changed:
+            changed.append(path)
+
+    return changed
 def _test_summary_from_results(results: List[Dict]) -> Dict:
     total = 0
     passed = 0
@@ -227,7 +276,6 @@ def _test_summary_from_results(results: List[Dict]) -> Dict:
         "passed": passed,
         "failed": failed,
     }
-
 
 def _classify_success_or_failure(results: list[dict], error: Exception | None) -> str:
     if error is not None:
@@ -269,14 +317,21 @@ def _classify_success_or_failure(results: list[dict], error: Exception | None) -
             if isinstance(result, str) and result.startswith("[ERROR"):
                 return "PATCH_REJECTED"
 
+        if tool == "PATCH_EDIT":
+            if _result_denied(result):
+                return "PATCH_REJECTED"
+            if not _result_ok(result):
+                return "PATCH_REJECTED"
+
         if tool == "GIT_RUN":
             if isinstance(result, dict):
+                if result.get("denied") is True:
+                    return "FAILED"
                 exit_code = _result_exit_code(result)
                 if exit_code not in (None, 0):
                     return "FAILED"
 
     return "SUCCESS"
-
 
 def _build_summary(
     *,
@@ -291,7 +346,10 @@ def _build_summary(
 
     intent = _intent_from_plan(plan)
     created = _created_paths_from_results(results)
-    modified = _changed_paths_from_results(results)
+    patch_apply_paths = _patch_apply_paths_from_results(results)
+    patch_edit_paths = _patch_edit_paths_from_results(results)
+    modified_paths = _changed_paths_from_results(results)
+
     summary = {
         "plan_hash": plan_hash,
         "tx_id": tx_id,
@@ -302,14 +360,15 @@ def _build_summary(
         "steps_completed": len(results),
         "test_summary": _test_summary_from_results(results),
         "created_paths": created,
-        "modified_paths": modified,
         "changed_paths": created + [p for p in modified if p not in created],
+        "modified_paths": modified_paths,
+        "patch_apply_paths": patch_apply_paths,
+        "patch_edit_paths": patch_edit_paths,
         "requires_new_approval": status != "SUCCESS",
         "intent": intent,
     }
 
     return summary
-
 
 def _build_failure_envelope(
     *,
@@ -336,8 +395,11 @@ def _build_failure_envelope(
         exit_code = _result_exit_code(result)
         timed_out = _result_timed_out(result)
 
+
     created = _created_paths_from_results(results)
-    modified = _changed_paths_from_results(results)
+    patch_apply_paths = _patch_apply_paths_from_results(results)
+    patch_edit_paths = _patch_edit_paths_from_results(results)
+    modified_paths = _changed_paths_from_results(results)
 
     return {
         "plan_hash": plan_hash,
@@ -349,8 +411,10 @@ def _build_failure_envelope(
         "exit_code": exit_code,
         "timed_out": timed_out,
         "created_paths": created,
-        "modified_paths": modified,
         "changed_paths": created + [p for p in modified if p not in created],
+        "modified_paths": modified_paths,
+        "patch_apply_paths": patch_apply_paths,
+        "patch_edit_paths": patch_edit_paths,
         "error": str(error),
         "test_summary": _test_summary_from_results(results),
         "requires_new_approval": True,
@@ -553,7 +617,8 @@ def execute_plan(gateway, plan_hash: str):
                 "result": result,
             }
 
-            if step.tool in {"PATCH_APPLY", "FILE_CREATE"}:
+
+            if step.tool in {"PATCH_APPLY", "FILE_CREATE", "PATCH_EDIT"}:
                 record["path"] = step.args["path"]
 
             results.append(record)
@@ -589,7 +654,7 @@ def execute_plan(gateway, plan_hash: str):
             started_at=started_at,
             error=e,
         )
-        
+
 def _verify_workspace_drift(plan_hash: str) -> None:
     meta = load_approved_plan_meta(plan_hash)
 

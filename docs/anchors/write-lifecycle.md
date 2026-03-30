@@ -1,65 +1,115 @@
 # Write Lifecycle Architecture
 
-Defines the mutation control model.
+Status: Anchor
+
+Defines the current mutation control model.
 
 ---
 
-## Flow Overview
+## Current Write Tools
 
-1. Propose Patch
-2. Store Pending Patch
-3. Review Diff
-4. Approve Patch
-5. Apply Mutation
-6. Audit Event
-7. Optionally Revoke
+Two mutation tools exist and remain distinct:
 
----
+- `PATCH_APPLY`
+- `PATCH_EDIT`
 
-## Propose
+Both execute only through:
 
-- Accepts relative path + new content.
-- Generates unified diff.
-- Stores pending patch on disk.
-- Returns patch ID + diff.
-- Does NOT modify file.
+`plan.submit` or `task.plan`
+→ `plan.approve`
+→ `plan.execute`
+→ `ToolGateway`
+→ `PolicyEngine`
+→ filesystem tool implementation
 
-Audit: PATCH_PROPOSED
+No standalone write lifecycle bypass exists.
 
 ---
 
-## Approve
+## PATCH_APPLY Lifecycle
 
-- Requires valid patch ID.
-- Must not be revoked.
-- Applies patch.
-- Removes from pending store.
+`PATCH_APPLY` is used for whole-file replacement.
 
-Audit: PATCH_APPROVED
+Rules:
+
+- target file must already exist
+- request must provide workspace-relative `path`
+- request must provide full replacement `new_content`
+- execution requires approval
+- execution requires exact-path scoped capability token
+- execution is audited
+
+Use when:
+- the full replacement content is already known exactly
+
+Do not use when:
+- the change should target one exact anchored substring only
 
 ---
 
-## Revoke
+## PATCH_EDIT Lifecycle
 
-- Persistent revocation store.
-- Blocks propose and approve.
-- Survives CLI restarts.
+`PATCH_EDIT` is used for anchored exact-text replacement.
 
-Audit: WRITE_REVOKED
+Rules:
+
+- target file must already exist
+- request must provide workspace-relative `path`
+- request must provide non-empty `edits`
+- every edit item must include:
+  - `old_text`
+  - `new_text`
+- edit item may include:
+  - `occurrence`
+- step may include:
+  - `expected_file_sha256_before`
+- execution requires approval
+- execution requires exact-path scoped capability token
+- execution is audited
+
+Use when:
+- the current file content is known enough to target exact anchored text
+
+Do not use when:
+- the change is semantic only
+- the target is ambiguous and no exact anchor exists
+- the edit requires regex or fuzzy matching
+
+---
+
+## PATCH_EDIT Matching Rules
+
+- 0 exact matches denies
+- 1 exact match applies
+- repeated exact matches without `occurrence` denies
+- out-of-range `occurrence` denies
+
+Multi-edit behavior:
+
+- edits apply in declared order
+- each edit sees the progressively updated in-memory content
+- if any edit fails, the whole step denies
+- no partial write is committed
 
 ---
 
 ## Enforcement
 
-- Revocation checked on every write-related action.
-- Fail-closed if revoked.
-- No partial write state.
+For all mutation:
+
+- ToolGateway is the choke point
+- PolicyEngine remains deny-by-default
+- workspace boundary is enforced on resolved path
+- token scope must match exact path for mutation
+- all allow/deny paths are audited
+- unexpected state fails closed
 
 ---
 
 ## Guarantees
 
-- No silent overwrites.
-- Full diff visibility.
-- Persistent lifecycle.
-- Audit trace for every state change.
+- no silent overwrites
+- no out-of-workspace mutation
+- full approval-bound execution path
+- typed mutation semantics
+- append-only audit trail

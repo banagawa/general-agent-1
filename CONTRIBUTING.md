@@ -23,10 +23,25 @@ AgentLoop → ToolGateway → PolicyEngine → Tool
 
 Commands must be argv lists and executed with shell=False.
 
-### Patch Only Writes
+### Typed File Mutation Rules
 
-Never overwrite files directly.
-All mutation must be diff-visible and approval gated.
+Repository mutation uses two distinct tools:
+
+- `PATCH_APPLY` for whole-file replacement
+- `PATCH_EDIT` for anchored exact-text replacement
+
+Contributors must preserve that separation.
+
+Do not:
+- collapse both behaviors into one generic write path
+- add regex or fuzzy edit behavior to `PATCH_EDIT`
+- add fallback from `PATCH_EDIT` to `PATCH_APPLY`
+- bypass ToolGateway or PolicyEngine for mutation
+
+When updating docs, tests, or runtime behavior, keep capability mappings aligned:
+
+- `PATCH_APPLY` → `FS_WRITE_PATCH`
+- `PATCH_EDIT` → `FS_EDIT_PATCH`
 
 ### Deny By Default
 
