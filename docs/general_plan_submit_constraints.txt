@@ -166,6 +166,141 @@ when authoring PATCH_APPLY steps, always write paths relative to the workspace r
 Operational consequence:
 if a plan author prefixes a path with workspace/, the runtime may incorrectly resolve the target as workspace/workspace/... and the write may fail before tests run.
 
+General Validator Constraint #4: PATCH_EDIT Capability Name
+-----------------------------------------------------------
+For PATCH_EDIT, the capability name must be:
+
+patch.edit
+
+Required form:
+{
+  "tool": "PATCH_EDIT",
+  "capability": "patch.edit"
+}
+
+General Validator Constraint #5: PATCH_EDIT Requires Literal Edit Args
+----------------------------------------------------------------------
+PATCH_EDIT requires step args that include:
+- path
+- edits
+
+Required meaning:
+- args.path must be a non-empty workspace-relative string
+- args.edits must be a non-empty list
+- each edit item must include:
+  - old_text
+  - new_text
+- each edit item may include:
+  - occurrence
+- the step may also include:
+  - expected_file_sha256_before
+
+Accepted structural pattern:
+{
+  "step_id": 1,
+  "tool": "PATCH_EDIT",
+  "capability": "patch.edit",
+  "args": {
+    "path": "path/from/workspace/root/to/file.py",
+    "edits": [
+      {
+        "old_text": "before",
+        "new_text": "after"
+      }
+    ]
+  }
+}
+
+Valid repeated-match selector form:
+{
+  "step_id": 1,
+  "tool": "PATCH_EDIT",
+  "capability": "patch.edit",
+  "args": {
+    "path": "path/from/workspace/root/to/file.py",
+    "edits": [
+      {
+        "old_text": "before",
+        "new_text": "after",
+        "occurrence": 2
+      }
+    ],
+    "expected_file_sha256_before": "sha256hexvalue"
+  }
+}
+
+Important interpretation:
+- PATCH_EDIT is anchored exact-text replacement only
+- PATCH_EDIT is not a semantic editing instruction
+- PATCH_EDIT is not regex editing
+- PATCH_EDIT is not fuzzy matching
+- PATCH_EDIT is not AST patching
+- PATCH_EDIT does not accept line numbers as sufficient edit targeting
+
+Ambiguity rule:
+- 0 exact matches denies
+- 1 exact match applies
+- multiple exact matches without occurrence denies
+- occurrence outside the available exact matches denies
+
+Atomicity rule:
+- multiple edits in one PATCH_EDIT step are evaluated in order against progressively updated in-memory content
+- if any edit fails, the whole step denies and nothing is written
+
+PATCH_EDIT Quick Examples
+-------------------------
+
+Minimal valid PATCH_EDIT:
+{
+  "plan_id": "edit-example",
+  "steps": [
+    {
+      "step_id": 1,
+      "tool": "PATCH_EDIT",
+      "capability": "patch.edit",
+      "args": {
+        "path": "README.md",
+        "edits": [
+          {
+            "old_text": "old phrase",
+            "new_text": "new phrase"
+          }
+        ]
+      }
+    }
+  ]
+}
+
+Valid repeated-match PATCH_EDIT:
+{
+  "plan_id": "edit-example-2",
+  "steps": [
+    {
+      "step_id": 1,
+      "tool": "PATCH_EDIT",
+      "capability": "patch.edit",
+      "args": {
+        "path": "README.md",
+        "edits": [
+          {
+            "old_text": "repeated phrase",
+            "new_text": "updated phrase",
+            "occurrence": 2
+          }
+        ]
+      }
+    }
+  ]
+}
+
+Common PATCH_EDIT mistakes:
+- using capability fs.edit_patch instead of patch.edit
+- providing only a goal instead of literal old_text/new_text
+- relying on line numbers without exact text anchors
+- omitting occurrence when the target text appears more than once
+- assuming PATCH_EDIT can create a missing file
+
+
 What PATCH_APPLY Should Be Assumed To Do
 ----------------------------------------
 For planning purposes, assume this runtime treats PATCH_APPLY as:

@@ -5,12 +5,14 @@ MAX_STEPS_PER_PLAN = 25
 ALLOWED_TOOLS = {
     "GIT_RUN",
     "PATCH_APPLY",
+    "PATCH_EDIT",
     "TEST_RUN",
 }
 
 EXPECTED_CAPABILITY_BY_TOOL = {
     "GIT_RUN": "git.run",
     "PATCH_APPLY": "patch.apply",
+    "PATCH_EDIT": "patch.edit",
     "TEST_RUN": "test.run",
 }
 
@@ -52,6 +54,54 @@ def _validate_patch_apply(step: ToolStep) -> None:
 
     if "argv" in step.args:
         raise ValueError("PATCH_APPLY must not include args.argv")
+
+
+def _validate_patch_edit(step: ToolStep) -> None:
+    path = step.args.get("path")
+    edits = step.args.get("edits")
+    expected_file_sha256_before = step.args.get("expected_file_sha256_before")
+
+    _require_non_empty_string(path, "PATCH_EDIT args.path")
+
+    if not isinstance(edits, list) or len(edits) == 0:
+        raise ValueError("PATCH_EDIT args.edits must be non-empty list")
+
+    for index, edit in enumerate(edits, start=1):
+        if not isinstance(edit, dict):
+            raise ValueError(f"PATCH_EDIT args.edits[{index}] must be object")
+
+        old_text = edit.get("old_text")
+        new_text = edit.get("new_text")
+        occurrence = edit.get("occurrence")
+
+        if not isinstance(old_text, str):
+            raise ValueError(f"PATCH_EDIT args.edits[{index}].old_text must be string")
+
+        if not isinstance(new_text, str):
+            raise ValueError(f"PATCH_EDIT args.edits[{index}].new_text must be string")
+
+        if occurrence is not None:
+            if not isinstance(occurrence, int) or occurrence <= 0:
+                raise ValueError(
+                    f"PATCH_EDIT args.edits[{index}].occurrence must be positive int"
+                )
+
+        allowed_edit_fields = {"old_text", "new_text", "occurrence"}
+        unknown_edit_fields = set(edit.keys()) - allowed_edit_fields
+        if unknown_edit_fields:
+            names = ", ".join(sorted(unknown_edit_fields))
+            raise ValueError(
+                f"PATCH_EDIT args.edits[{index}] has unknown fields: {names}"
+            )
+
+    if expected_file_sha256_before is not None:
+        _require_non_empty_string(
+            expected_file_sha256_before,
+            "PATCH_EDIT args.expected_file_sha256_before",
+        )
+
+    if "argv" in step.args:
+        raise ValueError("PATCH_EDIT must not include args.argv")
 
 
 def _validate_test_run(step: ToolStep) -> None:
@@ -111,6 +161,8 @@ def validate_plan(plan: Plan) -> None:
             _validate_git_run(step)
         elif step.tool == "PATCH_APPLY":
             _validate_patch_apply(step)
+        elif step.tool == "PATCH_EDIT":
+            _validate_patch_edit(step)
         elif step.tool == "TEST_RUN":
             _validate_test_run(step)
         else:
