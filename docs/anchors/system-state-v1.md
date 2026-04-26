@@ -1,6 +1,6 @@
 # System State v1
 
-This document describes the merged system state after Sprint E.
+This document describes the merged system state after Sprint E plus the current typed mutation model.
 
 ---
 
@@ -25,6 +25,7 @@ The system currently maintains these invariants:
 - workspace boundary isolation
 - typed file mutation model:
   - PATCH_APPLY modifies existing files only
+  - PATCH_EDIT performs deterministic existing-file text edits only
   - FILE_CREATE creates new files only
 - append-only audit logging
 - approved-plan-only execution
@@ -76,13 +77,13 @@ Supported commands:
 
 Execution lifecycle:
 
-`task.plan` or `plan.submit`  
-→ pending plan created  
-→ `plan.approve` records approval metadata and workspace fingerprint  
-→ `plan.execute` runs central preflight validation  
-→ preflight validates approval metadata, hash match, and drift state  
-→ execution transitions `APPROVED -> IN_FLIGHT`  
-→ deterministic step execution begins  
+`task.plan` or `plan.submit`
+→ pending plan created
+→ `plan.approve` records approval metadata and workspace fingerprint
+→ `plan.execute` runs central preflight validation
+→ preflight validates approval metadata, hash match, and drift state
+→ execution transitions `APPROVED -> IN_FLIGHT`
+→ deterministic step execution begins
 → execution transitions to `EXECUTED` or `FAILED`
 
 Execution artifacts:
@@ -93,6 +94,52 @@ Execution artifacts:
 - `plans/executed/<plan_hash>.json`
 - `plans/summaries/<plan_hash>-<tx_id>.json`
 - `plans/failures/<plan_hash>-<tx_id>.json`
+
+---
+
+# Typed Mutation Model
+
+Two mutation tools are live and distinct.
+
+## PATCH_APPLY
+
+- whole-file replacement only
+- target file must already exist
+- exact-path scoped token
+- audited
+
+## PATCH_EDIT
+
+- anchored exact-text replacement only
+- target file must already exist
+- each edit item requires:
+  - `old_text`
+  - `new_text`
+- each edit item may include:
+  - `occurrence`
+- step may include:
+  - `expected_file_sha256_before`
+- exact-path scoped token
+- audited
+
+`PATCH_EDIT` is not:
+- regex editing
+- fuzzy matching
+- AST patching
+- line-number-only editing
+- fallback whole-file rewrite
+
+Ambiguity behavior:
+
+- 0 matches denies
+- 1 exact match applies
+- repeated exact matches without `occurrence` denies
+- out-of-range `occurrence` denies
+
+Atomicity behavior:
+
+- multi-edit steps apply in declared order to progressively updated in-memory content
+- if any edit fails, the whole step denies and nothing is written
 
 ---
 
@@ -141,7 +188,10 @@ Execution summaries record:
 - `steps_attempted`
 - `steps_completed`
 - `test_summary`
-- `changed_paths`
+- `modified_paths`
+- `patch_apply_paths`
+- `patch_edit_paths`
+- `changed_paths` (compatibility alias of `modified_paths`)
 - `requires_new_approval`
 - `intent`
 
@@ -154,7 +204,10 @@ Failure envelopes record at least:
 - `tool`
 - `exit_code`
 - `timed_out`
-- `changed_paths`
+- `modified_paths`
+- `patch_apply_paths`
+- `patch_edit_paths`
+- `changed_paths` (compatibility alias of `modified_paths`)
 - `error`
 - `test_summary`
 - `requires_new_approval`
@@ -182,24 +235,30 @@ Representative deny reason codes:
 - `PLAN_HASH_MISMATCH`
 - `INVALID_PLAN_HASH`
 
-Audit logs are append-only.
+Typed mutation audit events include:
+
+- `PATCH_EDIT_ALLOWED`
+- `PATCH_EDIT_DENIED`
+- `PATCH_EDIT_EXECUTED`
 
 ---
 
-# Sprint Status
+# Current Limits
 
-| Sprint | Status |
-|---|---|
-| Sprint A | Complete |
-| Sprint B | Complete |
-| Sprint C | Complete |
-| Sprint D | Complete |
-| Sprint E | Complete |
+Current runtime limits in code:
+
+- maximum steps per plan validation: `25`
+- maximum steps per execution: `25`
+- maximum execution seconds: `120`
+
+If limits are exceeded, execution fails closed.
 
 ---
 
-# Next Phase
+# Current Non-Goals
 
-Sprint F — Controlled Autonomy Mode
-
-That phase is next. It is not the current merged behavior.
+- no uncontrolled autonomy
+- no background execution
+- no planner-driven execution bypass
+- no silent permission escalation
+- no out-of-workspace mutation
