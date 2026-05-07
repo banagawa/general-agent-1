@@ -4,7 +4,7 @@ import json
 
 from audit.log import log_event
 from policy.capabilities import revoke_all_tokens, revoke_token
-from sandbox.mounts import WORKSPACE_ROOT
+from sandbox.mounts import get_workspace_root
 
 from agent_core.plan_executor import approve_plan, execute_plan, submit_plan
 from agent_core.plan_schema import Plan, ToolStep
@@ -49,7 +49,7 @@ class AgentLoop:
             for p in paths[:3]:
                 content = self.gateway.read_abs_path(p)
                 snippet = content[:400].replace("\n", " ")
-                relative = p.relative_to(WORKSPACE_ROOT)
+                relative = p.relative_to(get_workspace_root())
                 out.append(f"- {relative}: {snippet}")
 
             return "\n".join(out)
