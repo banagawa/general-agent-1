@@ -9,19 +9,39 @@ from sandbox.mounts import get_workspace_root
 
 from .plan_schema import Plan, ToolStep
 
+def _plan_root() -> Path:
+    return get_workspace_root() / "plans"
 
-PLAN_ROOT = get_workspace_root() / "plans"
-PENDING_DIR = PLAN_ROOT / "pending"
-APPROVED_DIR = PLAN_ROOT / "approved"
-EXECUTED_DIR = PLAN_ROOT / "executed"
-FAILURES_DIR = PLAN_ROOT / "failures"
-SUMMARIES_DIR = PLAN_ROOT / "summaries"
 
-PENDING_DIR.mkdir(parents=True, exist_ok=True)
-APPROVED_DIR.mkdir(parents=True, exist_ok=True)
-EXECUTED_DIR.mkdir(parents=True, exist_ok=True)
-FAILURES_DIR.mkdir(parents=True, exist_ok=True)
-SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
+def _pending_dir() -> Path:
+    return _plan_root() / "pending"
+
+
+def _approved_dir() -> Path:
+    return _plan_root() / "approved"
+
+
+def _executed_dir() -> Path:
+    return _plan_root() / "executed"
+
+
+def _failures_dir() -> Path:
+    return _plan_root() / "failures"
+
+
+def _summaries_dir() -> Path:
+    return _plan_root() / "summaries"
+
+
+def _ensure_plan_dirs() -> None:
+    for path in (
+        _pending_dir(),
+        _approved_dir(),
+        _executed_dir(),
+        _failures_dir(),
+        _summaries_dir(),
+    ):
+        path.mkdir(parents=True, exist_ok=True)
 
 STATE_APPROVED = "APPROVED"
 STATE_IN_FLIGHT = "IN_FLIGHT"
@@ -79,29 +99,34 @@ def _write_json(path: Path, payload: dict) -> None:
 def _write_plan(path: Path, plan: Plan) -> None:
     _write_json(path, _plan_to_dict(plan))
 
-
 def pending_plan_path(plan_hash: str) -> Path:
-    return PENDING_DIR / f"{plan_hash}.json"
+    _ensure_plan_dirs()
+    return _pending_dir() / f"{plan_hash}.json"
 
 
 def approved_plan_path(plan_hash: str) -> Path:
-    return APPROVED_DIR / f"{plan_hash}.json"
+    _ensure_plan_dirs()
+    return _approved_dir() / f"{plan_hash}.json"
 
 
 def approved_plan_meta_path(plan_hash: str) -> Path:
-    return APPROVED_DIR / f"{plan_hash}.meta.json"
+    _ensure_plan_dirs()
+    return _approved_dir() / f"{plan_hash}.meta.json"
 
 
 def executed_plan_path(plan_hash: str) -> Path:
-    return EXECUTED_DIR / f"{plan_hash}.json"
+    _ensure_plan_dirs()
+    return _executed_dir() / f"{plan_hash}.json"
 
 
 def failure_envelope_path(plan_hash: str, tx_id: str) -> Path:
-    return FAILURES_DIR / f"{plan_hash}-{tx_id}.json"
+    _ensure_plan_dirs()
+    return _failures_dir() / f"{plan_hash}-{tx_id}.json"
 
 
 def summary_path(plan_hash: str, tx_id: str) -> Path:
-    return SUMMARIES_DIR / f"{plan_hash}-{tx_id}.json"
+    _ensure_plan_dirs()
+    return _summaries_dir() / f"{plan_hash}-{tx_id}.json"
 
 def transition_to_in_flight_atomic(plan_hash: str, payload: dict) -> Path:
     state = payload.get("state")
