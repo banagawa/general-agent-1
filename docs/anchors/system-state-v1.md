@@ -56,6 +56,12 @@ Planner source may be:
 Planner output is still just a proposal.
 It does not execute tools, approve plans, or bypass policy.
 
+Autonomy state:
+- `task.autonomy` produces approval-bound pending plans
+- autonomy budgets are enforced before submission
+- rollback restores original file state on failure
+- autonomy decisions emit audit events
+
 Planner metadata recorded on submitted plans includes:
 
 - planner source

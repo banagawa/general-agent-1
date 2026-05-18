@@ -1,5 +1,50 @@
 # Sprint History
 
+## Sprint F — Controlled Autonomy Mode
+
+Branch: `agent-self-dev`
+Status: Complete
+Closed: 2026-05-18
+
+Goal:
+Reduce operational involvement while preserving PLAN approval, capability scope, workspace boundary, rollback safety, and auditability.
+
+Outcome:
+- `task.autonomy` command added
+- `MANUAL`, `ASSISTED`, and `BOUNDED_AUTONOMOUS` modes implemented
+- bounded autonomy remains feature-flag gated
+- autonomy operates on `TaskSpec`
+- budget validation and budget remaining output added
+- cycle, runtime, and mutation-step budgets enforced before pending-plan creation
+- failed mutation execution rolls back changed files
+- rollback deduplicates repeated edits to the same path
+- autonomy and rollback decision events are audited
+- Sprint F acceptance-lock tests added
+- full suite passed: `108 passed`
+
+Command surface:
+- `task.autonomy`
+- `task.plan`
+- `plan.submit`
+- `plan.approve`
+- `plan.execute`
+
+Security boundary:
+- no new direct execution surface
+- no approval bypass
+- no autonomous tool execution outside `plan.execute`
+- no workspace boundary expansion
+- no hidden supervisor state
+
+Deferred to Sprint G:
+- multi-cycle continuation orchestration
+- supervisor state graph
+- strategy/evaluation loop
+- autonomous continuation policy after approval
+
+---
+
+
 ## Sprint A — Sandbox & ToolGateway
 
 Goal:

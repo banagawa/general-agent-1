@@ -28,6 +28,13 @@ Human
 
 No direct loop-to-tool execution is allowed.
 
+Controlled autonomy invariants:
+- autonomy modes may only create pending plans
+- only `plan.execute` may execute steps
+- bounded autonomy is disabled unless explicitly feature-flag enabled
+- runtime, cycle, and mutation budgets fail closed
+- mutation failures trigger rollback
+
 ---
 
 ## 2. Deny-by-default policy

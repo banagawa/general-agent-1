@@ -8,6 +8,30 @@ If another document conflicts with this file, this file wins.
 
 ---
 
+## Sprint F Autonomy Contract
+
+Controlled autonomy does not change the execution spine.
+
+`task.autonomy` may create a pending plan through the same TaskSpec/planner/submit path as `task.plan`.
+
+Autonomy modes:
+- `MANUAL`
+- `ASSISTED`
+- `BOUNDED_AUTONOMOUS`
+
+Required constraints:
+- bounded autonomy is disabled unless `AGENT_BOUNDED_AUTONOMY_ENABLED` is enabled
+- all autonomy modes stop at pending approval
+- only `plan.execute` may execute steps
+- runtime, cycle, and mutation budgets must fail closed before submit
+- mutation failures must trigger rollback
+- rollback must restore earliest-original-state per path
+- decision points must be audited
+
+No autonomy mode may invoke tools directly.
+
+---
+
 ## Core Spine
 
 All execution must follow:
