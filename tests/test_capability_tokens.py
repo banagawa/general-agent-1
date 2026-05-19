@@ -55,3 +55,9 @@ def test_allow_path_scoped_token(isolated_repo: Path):
     vr = validate_token(tok.id, action="FS_WRITE_PATCH", context={"path": "/x"})
     assert vr.allowed is True
     assert vr.reason is None
+
+def test_allow_path_scoped_edit_token(isolated_repo: Path):
+    tok = issue_token(actions=["FS_EDIT_PATCH"], scope={"path": "/x"}, ttl_seconds=60)
+    vr = validate_token(tok.id, action="FS_EDIT_PATCH", context={"path": "/x"})
+    assert vr.allowed is True
+    assert vr.reason is None

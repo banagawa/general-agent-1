@@ -99,6 +99,91 @@ class ToolGateway:
             cap_token_id=cap_token_id,
         )
 
+    def patch_edit(
+        self,
+        path: Path | str,
+        edits: List[Dict[str, Any]],
+        expected_file_sha256_before: Optional[str] = None,
+        cap_token_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        assert_security_invariants(direct_tool_bypass=False)
+        resolved_path = Path(path)
+
+        vr = validate_token(
+            token_id=cap_token_id,
+            action="FS_EDIT_PATCH",
+            context={"path": str(resolved_path)},
+        )
+        if not vr.allowed:
+            log_event(
+                "PATCH_EDIT_DENIED",
+                {
+                    "path": str(resolved_path),
+                    "token_id": vr.token_id,
+                    "decision": "deny",
+                    "reason": vr.reason,
+                },
+            )
+            return {"ok": False, "denied": True, "reason": vr.reason}
+
+        if not self.policy.is_allowed("FS_EDIT_PATCH", resolved_path):
+            log_event(
+                "PATCH_EDIT_DENIED",
+                {
+                    "path": str(resolved_path),
+                    "token_id": vr.token_id,
+                    "decision": "deny",
+                    "reason": "policy",
+                },
+            )
+            return {"ok": False, "denied": True, "reason": "policy"}
+
+        log_event(
+            "PATCH_EDIT_ALLOWED",
+            {
+                "path": str(resolved_path),
+                "token_id": vr.token_id,
+                "decision": "allow",
+                "edit_count": len(edits),
+                "hash_guard_present": expected_file_sha256_before is not None,
+            },
+        )
+
+        try:
+            result = self.fs.patch_edit(
+                path=resolved_path,
+                edits=edits,
+                expected_file_sha256_before=expected_file_sha256_before,
+            )
+        except Exception as e:
+            reason = str(e)
+            log_event(
+                "PATCH_EDIT_DENIED",
+                {
+                    "path": str(resolved_path),
+                    "token_id": vr.token_id,
+                    "decision": "deny",
+                    "reason": reason,
+                    "edit_count": len(edits),
+                    "hash_guard_present": expected_file_sha256_before is not None,
+                },
+            )
+            return {"ok": False, "denied": True, "reason": reason}
+
+        log_event(
+            "PATCH_EDIT_EXECUTED",
+            {
+                "path": str(resolved_path),
+                "token_id": vr.token_id,
+                "decision": "allow",
+                "edit_count": len(edits),
+                "changed": result.get("changed"),
+                "sha256_before": result.get("sha256_before"),
+                "sha256_after": result.get("sha256_after"),
+            },
+        )
+        return result
+
     def cmd_run(
         self,
         argv: Sequence[str],

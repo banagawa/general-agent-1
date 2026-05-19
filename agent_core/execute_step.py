@@ -3,8 +3,8 @@ from __future__ import annotations
 from sandbox.mounts import get_workspace_root
 
 from .capability_guard import check_capability
-
 from agent_core.security_invariants import assert_security_invariants
+
 
 def execute_step(gateway, step):
     assert_security_invariants(direct_tool_bypass=False)
@@ -31,6 +31,16 @@ def execute_step(gateway, step):
         return gateway.create_file(
             path=path,
             content=step.args["content"],
+            cap_token_id=step.args.get("cap_token_id"),
+        )
+
+    if step.tool == "PATCH_EDIT":
+        workspace_root = get_workspace_root()
+        path = (workspace_root / step.args["path"]).resolve()
+        return gateway.patch_edit(
+            path=path,
+            edits=step.args["edits"],
+            expected_file_sha256_before=step.args.get("expected_file_sha256_before"),
             cap_token_id=step.args.get("cap_token_id"),
         )
 

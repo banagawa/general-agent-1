@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, UTC
+from pathlib import Path
 from typing import Any, List, Dict
 from audit.log import log_event
 from policy.capabilities import issue_token
@@ -37,6 +38,8 @@ TOKEN_ACTION_BY_TOOL = {
     "GIT_RUN": "GIT_RUN",
     "PATCH_APPLY": "FS_WRITE_PATCH",
     "FILE_CREATE": "FS_CREATE_FILE",
+    "PATCH_EDIT": "FS_EDIT_PATCH",
+
 }
 
 MAX_STEPS_PER_EXECUTION = 25
@@ -138,7 +141,9 @@ def _issue_step_token(step):
 
     scope = {}
 
-    if step.tool in {"PATCH_APPLY", "FILE_CREATE"}:
+
+    if step.tool in {"PATCH_APPLY", "FILE_CREATE", "PATCH_EDIT"}:
+
         from sandbox.mounts import get_workspace_root
 
         requested_path = step.args["path"]
@@ -176,6 +181,9 @@ def _result_exit_code(result: dict) -> int | None:
 def _result_timed_out(result: dict) -> bool:
     return bool(isinstance(result, dict) and result.get("timed_out") is True)
 
+def _result_denied(result: dict) -> bool:
+    return bool(isinstance(result, dict) and result.get("denied") is True)
+
 
 def _changed_paths_from_results(results: list[dict]) -> list[str]:
     '''
@@ -184,6 +192,11 @@ def _changed_paths_from_results(results: list[dict]) -> list[str]:
     It does NOT include FILE_CREATE paths.
     FILE_CREATE paths are handled separately via _created_paths_from_results.
     '''
+
+def _result_ok(result: dict) -> bool:
+    return bool(isinstance(result, dict) and result.get("ok") is True)
+
+def _patch_apply_paths_from_results(results: list[dict]) -> list[str]:
     changed = []
 
     for item in results:
@@ -200,6 +213,43 @@ def _changed_paths_from_results(results: list[dict]) -> list[str]:
 
     return changed
 
+
+def _patch_edit_paths_from_results(results: list[dict]) -> list[str]:
+    changed = []
+
+    for item in results:
+        if item["tool"] != "PATCH_EDIT":
+            continue
+
+        result = item.get("result")
+        if not isinstance(result, dict):
+            continue
+        if result.get("denied") is True:
+            continue
+        if result.get("ok") is not True:
+            continue
+        if result.get("changed") is not True:
+            continue
+
+        path = item.get("path")
+        if isinstance(path, str) and path not in changed:
+            changed.append(path)
+
+    return changed
+
+
+def _changed_paths_from_results(results: list[dict]) -> list[str]:
+    changed = []
+
+    for path in _patch_apply_paths_from_results(results):
+        if path not in changed:
+            changed.append(path)
+
+    for path in _patch_edit_paths_from_results(results):
+        if path not in changed:
+            changed.append(path)
+
+    return changed
 def _test_summary_from_results(results: List[Dict]) -> Dict:
     total = 0
     passed = 0
@@ -227,7 +277,6 @@ def _test_summary_from_results(results: List[Dict]) -> Dict:
         "passed": passed,
         "failed": failed,
     }
-
 
 def _classify_success_or_failure(results: list[dict], error: Exception | None) -> str:
     if error is not None:
@@ -269,14 +318,21 @@ def _classify_success_or_failure(results: list[dict], error: Exception | None) -
             if isinstance(result, str) and result.startswith("[ERROR"):
                 return "PATCH_REJECTED"
 
+        if tool == "PATCH_EDIT":
+            if _result_denied(result):
+                return "PATCH_REJECTED"
+            if not _result_ok(result):
+                return "PATCH_REJECTED"
+
         if tool == "GIT_RUN":
             if isinstance(result, dict):
+                if result.get("denied") is True:
+                    return "FAILED"
                 exit_code = _result_exit_code(result)
                 if exit_code not in (None, 0):
                     return "FAILED"
 
     return "SUCCESS"
-
 
 def _build_summary(
     *,
@@ -287,11 +343,15 @@ def _build_summary(
     status: str,
     started_at: str,
     finished_at: str,
+    rollback_report: dict | None = None,
 ) -> Dict:
 
     intent = _intent_from_plan(plan)
     created = _created_paths_from_results(results)
-    modified = _changed_paths_from_results(results)
+    patch_apply_paths = _patch_apply_paths_from_results(results)
+    patch_edit_paths = _patch_edit_paths_from_results(results)
+    modified_paths = _changed_paths_from_results(results)
+
     summary = {
         "plan_hash": plan_hash,
         "tx_id": tx_id,
@@ -302,14 +362,18 @@ def _build_summary(
         "steps_completed": len(results),
         "test_summary": _test_summary_from_results(results),
         "created_paths": created,
-        "modified_paths": modified,
-        "changed_paths": created + [p for p in modified if p not in created],
+        "changed_paths": created + [p for p in modified_paths if p not in created],
+        "modified_paths": modified_paths,
+        "patch_apply_paths": patch_apply_paths,
+        "patch_edit_paths": patch_edit_paths,
         "requires_new_approval": status != "SUCCESS",
         "intent": intent,
     }
 
-    return summary
+    if rollback_report is not None:
+        summary["rollback"] = rollback_report
 
+    return summary
 
 def _build_failure_envelope(
     *,
@@ -319,6 +383,7 @@ def _build_failure_envelope(
     results: List[Dict],
     failure_class: str,
     error: Exception,
+    rollback_report: dict | None = None,
 ) -> Dict:
 
     intent = _intent_from_plan(plan)
@@ -336,10 +401,13 @@ def _build_failure_envelope(
         exit_code = _result_exit_code(result)
         timed_out = _result_timed_out(result)
 
-    created = _created_paths_from_results(results)
-    modified = _changed_paths_from_results(results)
 
-    return {
+    created = _created_paths_from_results(results)
+    patch_apply_paths = _patch_apply_paths_from_results(results)
+    patch_edit_paths = _patch_edit_paths_from_results(results)
+    modified_paths = _changed_paths_from_results(results)
+
+    envelope = {
         "plan_hash": plan_hash,
         "tx_id": tx_id,
         "result_status": "FAILED",
@@ -349,13 +417,20 @@ def _build_failure_envelope(
         "exit_code": exit_code,
         "timed_out": timed_out,
         "created_paths": created,
-        "modified_paths": modified,
-        "changed_paths": created + [p for p in modified if p not in created],
+        "changed_paths": created + [p for p in modified_paths if p not in created],
+        "modified_paths": modified_paths,
+        "patch_apply_paths": patch_apply_paths,
+        "patch_edit_paths": patch_edit_paths,
         "error": str(error),
         "test_summary": _test_summary_from_results(results),
         "requires_new_approval": True,
         "intent": intent,
     }
+
+    if rollback_report is not None:
+        envelope["rollback"] = rollback_report
+
+    return envelope
 
 
 def _finalize_execution(
@@ -367,6 +442,7 @@ def _finalize_execution(
     status: str,
     started_at: str,
     error: Exception | None = None,
+    rollback_report: dict | None = None,
 ):
     finished_at = _utc_now_iso()
 
@@ -378,6 +454,7 @@ def _finalize_execution(
         status=status,
         started_at=started_at,
         finished_at=finished_at,
+        rollback_report=rollback_report,
     )
 
     write_summary(plan_hash, tx_id, summary)
@@ -434,6 +511,7 @@ def _finalize_execution(
         results=results,
         failure_class=status,
         error=error if error else RuntimeError(status),
+        rollback_report=rollback_report,
     )
 
     write_failure_envelope(plan_hash, tx_id, envelope)
@@ -476,6 +554,99 @@ def _created_paths_from_results(results: list[dict]) -> list[str]:
             created.append(path)
 
     return created
+
+
+_MUTATING_TOOLS = {"PATCH_APPLY", "PATCH_EDIT", "FILE_CREATE"}
+
+
+def _mutation_path(step) -> Path:
+    from sandbox.mounts import get_workspace_root
+
+    workspace_root = get_workspace_root().resolve()
+    path = (workspace_root / step.args["path"]).resolve()
+    path.relative_to(workspace_root)
+    return path
+
+
+def _capture_mutation_snapshot(step) -> dict:
+    path = _mutation_path(step)
+    existed = path.exists()
+    content = None
+
+    if existed:
+        if not path.is_file():
+            raise ValueError("mutation target is not file")
+        content = path.read_text(encoding="utf-8")
+
+    return {
+        "step_id": step.step_id,
+        "tool": step.tool,
+        "path": step.args["path"],
+        "absolute_path": str(path),
+        "existed": existed,
+        "content": content,
+    }
+
+
+def _rollback_mutations(plan_hash: str, tx_id: str, snapshots: list[dict]) -> dict:
+    report = {
+        "attempted": False,
+        "restored_paths": [],
+        "deleted_paths": [],
+        "errors": [],
+    }
+
+    if not snapshots:
+        return report
+
+    earliest_by_path: dict[str, dict] = {}
+    ordered_paths: list[str] = []
+
+    for snapshot in snapshots:
+        key = snapshot["absolute_path"]
+        if key not in earliest_by_path:
+            earliest_by_path[key] = snapshot
+            ordered_paths.append(key)
+
+    rollback_snapshots = [earliest_by_path[key] for key in reversed(ordered_paths)]
+
+    report["attempted"] = True
+    log_event(
+        "PLAN_ROLLBACK_STARTED",
+        {
+            "plan_hash": plan_hash,
+            "tx_id": tx_id,
+            "paths": [snapshot["path"] for snapshot in rollback_snapshots],
+        },
+    )
+
+    for snapshot in rollback_snapshots:
+        path = Path(snapshot["absolute_path"])
+        rel_path = snapshot["path"]
+
+        try:
+            if snapshot["existed"]:
+                path.write_text(snapshot["content"], encoding="utf-8")
+                report["restored_paths"].append(rel_path)
+            else:
+                if path.exists():
+                    path.unlink()
+                report["deleted_paths"].append(rel_path)
+        except Exception as e:
+            report["errors"].append({"path": rel_path, "error": str(e)})
+
+    log_event(
+        "PLAN_ROLLBACK_FINISHED",
+        {
+            "plan_hash": plan_hash,
+            "tx_id": tx_id,
+            "restored_paths": report["restored_paths"],
+            "deleted_paths": report["deleted_paths"],
+            "errors": report["errors"],
+        },
+    )
+
+    return report
 
 # -----------------------------------------------------------------------------
 # Execution
@@ -532,6 +703,7 @@ def execute_plan(gateway, plan_hash: str):
     )
 
     results: List[Dict] = []
+    mutation_snapshots: list[dict] = []
 
     try:
 
@@ -545,6 +717,9 @@ def execute_plan(gateway, plan_hash: str):
 
             step.args["cap_token_id"] = cap_token_id
 
+            if step.tool in _MUTATING_TOOLS:
+                mutation_snapshots.append(_capture_mutation_snapshot(step))
+
             result = execute_step(gateway, step)
 
             record = {
@@ -553,7 +728,8 @@ def execute_plan(gateway, plan_hash: str):
                 "result": result,
             }
 
-            if step.tool in {"PATCH_APPLY", "FILE_CREATE"}:
+
+            if step.tool in {"PATCH_APPLY", "FILE_CREATE", "PATCH_EDIT"}:
                 record["path"] = step.args["path"]
 
             results.append(record)
@@ -566,6 +742,9 @@ def execute_plan(gateway, plan_hash: str):
                 raise RuntimeError("time budget exceeded")
 
         status = _classify_success_or_failure(results, None)
+        rollback_report = None
+        if status != "SUCCESS":
+            rollback_report = _rollback_mutations(plan_hash, tx_id, mutation_snapshots)
 
         return _finalize_execution(
             plan=plan,
@@ -574,11 +753,13 @@ def execute_plan(gateway, plan_hash: str):
             results=results,
             status=status,
             started_at=started_at,
+            rollback_report=rollback_report,
         )
 
     except Exception as e:
 
         failure_class = _classify_success_or_failure(results, e)
+        rollback_report = _rollback_mutations(plan_hash, tx_id, mutation_snapshots)
 
         return _finalize_execution(
             plan=plan,
@@ -588,8 +769,9 @@ def execute_plan(gateway, plan_hash: str):
             status=failure_class,
             started_at=started_at,
             error=e,
+            rollback_report=rollback_report,
         )
-        
+
 def _verify_workspace_drift(plan_hash: str) -> None:
     meta = load_approved_plan_meta(plan_hash)
 

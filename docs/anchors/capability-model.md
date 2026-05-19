@@ -1,6 +1,8 @@
-# Capability Token Model (Implemented in Sprint A5)
+# Capability Token Model
 
-This document defines the transition from global write revocation to tokenized capability enforcement.
+Status: Active Architecture Anchor
+
+This document defines the scoped token model used at execution time.
 
 ---
 
@@ -8,16 +10,17 @@ This document defines the transition from global write revocation to tokenized c
 
 Move from:
 
-Global write flag
+global mutation or command permission
 
 To:
 
-Scoped, expiring, token-based capabilities.
+scoped, expiring, token-based capabilities checked per tool invocation.
 
 ---
 
 ## Token Schema
 
+```text
 {
   id,
   actions,
@@ -26,48 +29,70 @@ Scoped, expiring, token-based capabilities.
   expiry,
   issued_at
 }
+```
 
 ---
 
 ## Enforcement Rules
 
-- Every tool call checks token validity.
-- Expired tokens deny automatically.
-- Revocation list keyed by token ID.
-- No global write flag.
+- every tool call checks token validity
+- expired tokens deny automatically
+- revocation is keyed by token ID
+- missing token denies
+- mismatched scope denies
+- unexpected token state fails closed
 
 ---
 
-## Token Types (Planned)
+## Token Types
 
-FS_WRITE_PATCH  
-CMD_RUN  
-Future: CONNECTOR_*  
+- `FS_WRITE_PATCH`
+- `FS_EDIT_PATCH`
+- `CMD_RUN`
+- `GIT_RUN`
+
+Future:
+- `CONNECTOR_*`
+
+---
+
+## Scope Model
+
+Current scoped use:
+
+- `PATCH_APPLY` → exact-path scope
+- `PATCH_EDIT` → exact-path scope
+- `TEST_RUN` → action-scoped
+- `GIT_RUN` → action-scoped
+
+Exact-path scoped means the token is valid only for the resolved workspace path for the approved step.
 
 ---
 
 ## Expiry Model
 
-- Always set.
-- Even long-lived tokens expire.
-- Enforced per invocation.
+- every token expires
+- expiry is enforced per invocation
+- execution must deny if a token is expired
 
 ---
 
 ## Revocation Model
 
-- Stored on disk.
-- Revocation invalidates token immediately.
-- Fail-closed if token missing or invalid.
+- stored on disk
+- revocation invalidates token immediately
+- fail closed if token is revoked, missing, or malformed
 
 ---
 
 ## Bridge to UX
 
-Enables:
+This model enables later UX such as:
 
-- Permission request cards
-- Scoped grants
-- Time-based approval
-- One-click revoke
-- Active grants list
+- permission request cards
+- scoped grants
+- time-based approval
+- one-click revoke
+- active grants list
+
+without changing the core execution boundary.

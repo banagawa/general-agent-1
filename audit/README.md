@@ -1,5 +1,14 @@
 # General Agent 1
 
+## Sprint F Audit Events
+
+- AUTONOMY_CYCLE_RECORDED
+- AUTONOMY_BUDGET_EXHAUSTED
+- AUTONOMY_PLAN_PENDING_APPROVAL
+- PLAN_ROLLBACK_STARTED
+- PLAN_ROLLBACK_FINISHED
+
+
 A deterministic, policy-enforced software agent for repository work.
 
 The system preserves five core invariants:
@@ -7,11 +16,7 @@ The system preserves five core invariants:
 - ToolGateway is the single execution choke point
 - deny-by-default policy enforcement
 - workspace boundary isolation
-- typed, reviewable file mutations:
-  - PATCH_APPLY (existing-file modification only)
-  - PATCH_EDIT (deterministic existing-file text edit only)
-  - FILE_CREATE (new-file creation only)
-
+- patch-only typed file mutation
 - append-only audit logging
 
 Execution remains fail-closed and approval-bound.
@@ -26,15 +31,6 @@ The runtime now supports two approved front doors:
 2. `plan.submit:<json>`
 
 Both feed the same approval-bound execution path.
-
-3. `task.autonomy:<json>`
-
-`task.autonomy` supports:
-- `MANUAL`
-- `ASSISTED`
-- `BOUNDED_AUTONOMOUS`
-
-Bounded autonomy remains approval-bound and feature-flag gated.
 
 Execution spine:
 
@@ -172,7 +168,8 @@ Current step-to-capability mapping:
 - `GIT_RUN` → `GIT_RUN`
 - `PATCH_APPLY` → `FS_WRITE_PATCH`
 - `PATCH_EDIT` → `FS_EDIT_PATCH`
-- `FILE_CREATE ` → `FS_CREATE_FILE`
+
+Tokens are issued per approved step during execution.
 
 ---
 

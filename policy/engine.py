@@ -52,12 +52,7 @@ class PolicyEngine:
             resolved = path.resolve()
         except Exception:
             return False
-        '''
-        try:
-            resolved.relative_to(WORKSPACE_ROOT)
-        except ValueError:
-            return False
-        '''
+
         try:
             workspace_root = get_workspace_root().resolve()
             resolved.relative_to(workspace_root)
@@ -69,7 +64,7 @@ class PolicyEngine:
             if pattern in s:
                 return False
 
-        if action not in ("FS_READ", "FS_SEARCH", "FS_WRITE_PATCH", "FS_CREATE_FILE"):
+        if action not in ("FS_READ", "FS_SEARCH", "FS_WRITE_PATCH", "FS_EDIT_PATCH", "FS_CREATE_FILE"):
             return False
 
         return True

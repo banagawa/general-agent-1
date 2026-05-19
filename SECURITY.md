@@ -43,10 +43,34 @@ Any action not explicitly allowed by policy must be denied.
 
 Filesystem access must remain within WORKSPACE_ROOT.
 
-4. Patch Only Mutation
+4. Typed Mutation Model
 
-Files may not be overwritten directly.
-All mutation must be diff-visible and approval gated.
+The system permits file mutation only through two distinct typed operations:
+
+- `PATCH_APPLY`
+  - whole-file replacement only
+  - target file must already exist
+  - exact-path scoped capability token required
+  - audited
+
+- `PATCH_EDIT`
+  - anchored exact-text replacement only
+  - target file must already exist
+  - requires literal `old_text` and `new_text`
+  - supports optional `occurrence`
+  - supports optional `expected_file_sha256_before`
+  - exact-path scoped capability token required
+  - audited
+
+`PATCH_EDIT` is not:
+- regex editing
+- fuzzy matching
+- AST patching
+- line-number-only targeting
+- fallback whole-file rewrite
+
+This separation is a security boundary.
+Mutation behavior must remain fail-closed and must not silently widen from anchored edit to whole-file overwrite.
 
 5. Explicit Approval
 
@@ -76,6 +100,12 @@ New capabilities are allowed only if:
 - policy gating remains intact
 - workspace boundary remains enforced
 - mutations remain visible
+
+Current mutation token actions:
+
+- `PATCH_APPLY` → `FS_WRITE_PATCH`
+- `PATCH_EDIT` → `FS_EDIT_PATCH`
+
 - actions remain auditable
 
 ---
