@@ -1,5 +1,18 @@
 # General Agent 1
 
+## Sprint F Acceptance
+
+```bash
+python -m pytest -q tests/test_sprint_f_acceptance.py
+```
+
+Full suite:
+
+```bash
+python -m pytest -q
+```
+
+
 A deterministic, policy-enforced software agent for repository work.
 
 The system preserves five core invariants:

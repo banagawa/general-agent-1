@@ -27,6 +27,15 @@ The runtime now supports two approved front doors:
 
 Both feed the same approval-bound execution path.
 
+3. `task.autonomy:<json>`
+
+`task.autonomy` supports:
+- `MANUAL`
+- `ASSISTED`
+- `BOUNDED_AUTONOMOUS`
+
+Bounded autonomy remains approval-bound and feature-flag gated.
+
 Execution spine:
 
 Human

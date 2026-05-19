@@ -1,5 +1,14 @@
 # General Agent 1
 
+## Sprint F Audit Events
+
+- AUTONOMY_CYCLE_RECORDED
+- AUTONOMY_BUDGET_EXHAUSTED
+- AUTONOMY_PLAN_PENDING_APPROVAL
+- PLAN_ROLLBACK_STARTED
+- PLAN_ROLLBACK_FINISHED
+
+
 A deterministic, policy-enforced software agent for repository work.
 
 The system preserves five core invariants:

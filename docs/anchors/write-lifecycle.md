@@ -24,6 +24,11 @@ Both execute only through:
 
 No standalone write lifecycle bypass exists.
 
+Rollback guarantees:
+- failed mutation execution triggers rollback
+- rollback restores earliest-original-state per path
+- rollback actions are audited
+
 ---
 
 ## PATCH_APPLY Lifecycle
