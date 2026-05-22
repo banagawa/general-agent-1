@@ -5,8 +5,15 @@ from pathlib import Path
 
 
 def get_workspace_root() -> Path:
-    raw = os.getenv("AGENT_WORKSPACE_ROOT") or os.getenv("AGENT_WORKSPACE") or "workspace"
-    root = Path(raw).expanduser().resolve()
+
+    app_root = Path(__file__).resolve().parents[1]
+
+    raw = os.getenv("AGENT_WORKSPACE_ROOT") or os.getenv("AGENT_WORKSPACE")
+
+    if raw:
+        root = Path(raw).expanduser().resolve()
+    else:
+        root = (app_root / "workspace").resolve()
 
     _assert_not_live_app_repo(root)
 
