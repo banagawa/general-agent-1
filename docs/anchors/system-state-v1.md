@@ -1,6 +1,6 @@
 # System State v1
 
-This document describes the merged system state after Sprint E plus the current typed mutation model.
+This document describes the merged system state after Sprint G plus the current typed mutation, worktree-safe root model, and deterministic strategy foundation.
 
 ---
 
@@ -13,6 +13,15 @@ Human → `task.plan` or `plan.submit` → `plan.approve` → `plan.execute` →
 All tool execution passes through ToolGateway.
 
 Execution remains deterministic, approval-bound, and fail-closed.
+
+Current root model:
+
+- `app_root`: authoritative runtime/security-code root
+- `workspace_root`: mutation boundary
+- `execution_root`: command/test cwd
+- `runtime_import_root`: imported runtime module source
+
+Worktree execution requires explicit separation of runtime root and mutation root. `AGENT_APP_ROOT` may bind the authoritative app root so cwd does not redefine runtime identity.
 
 ---
 
@@ -35,6 +44,8 @@ The system currently maintains these invariants:
 - explicit execution state transitions
 - single-use execution per approval
 - reason-coded deny audit
+- Sprint F controlled autonomy completed
+- worktree-safe runtime/workspace root separation
 
 ---
 
@@ -246,6 +257,25 @@ Typed mutation audit events include:
 - `PATCH_EDIT_ALLOWED`
 - `PATCH_EDIT_DENIED`
 - `PATCH_EDIT_EXECUTED`
+
+---
+
+# Current Development State
+
+Sprint F is complete.
+
+Sprint G deterministic improvement foundation is complete.
+
+Current completed Sprint G behavior:
+- execution outcomes are normalized through `CycleOutcome`
+- strategy records and proposals are inert data
+- registry writes are append-only JSONL
+- proposal generation is deterministic from execution outcomes
+- proposal integration is post-cycle only
+- proposal generation does not auto-install strategies
+- `TEST_RUN` supports explicit cwd modes: `workspace` and `app`
+
+Future strategy installation remains approval-gated and out of scope for this completed foundation.
 
 ---
 

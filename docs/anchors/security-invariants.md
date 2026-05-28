@@ -51,13 +51,21 @@ Required properties:
 
 ## 3. Workspace boundary isolation
 
-All filesystem mutation must remain inside `WORKSPACE_ROOT`.
+All filesystem mutation must remain inside `WORKSPACE_ROOT`. Runtime authority and mutation authority must remain separate.
 
 Required properties:
 - paths are canonicalized with `resolve()`
 - resolved paths are checked against workspace boundary
 - escape attempts deny
 - mutation outside workspace is forbidden
+- `app_root` is the authoritative runtime/security-code root
+- `workspace_root` is the mutation boundary
+- `execution_root` is command/test cwd only
+- `runtime_import_root` must not be derived from mutable workspace cwd
+- `workspace_root` must be app-root anchored or explicitly configured
+- cwd-relative workspace defaults are forbidden
+- `app_root` and `workspace_root` must never collapse
+- `AGENT_APP_ROOT` may bind runtime root for worktree-safe execution
 
 ---
 
@@ -109,6 +117,8 @@ Current mappings:
 
 Mutation tokens must remain exact-path scoped.
 
+`TEST_RUN` may select only `cwd: "workspace"` or `cwd: "app"`; raw cwd paths are forbidden.
+
 ---
 
 ## 6. Approval-bound execution
@@ -125,7 +135,22 @@ Planner-generated plans are proposals only and do not bypass approval.
 
 ---
 
-## 7. Drift binding
+## 7. Strategy data boundary
+
+Sprint G strategy behavior must remain inert unless explicitly approved by a later workflow.
+
+Required properties:
+- strategies are data only
+- strategy proposals do not execute tools
+- strategy proposals do not mutate policy
+- strategy proposals do not modify plan schema
+- strategy proposals do not expand autonomy
+- strategy registry records are append-only
+- automatic strategy installation is forbidden
+
+---
+
+## 8. Drift binding
 
 Approval binds to workspace state.
 

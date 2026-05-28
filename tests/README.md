@@ -87,7 +87,7 @@ Use `plan.submit` when you want to submit explicit PLAN JSON.
 Simple test example:
 
 ```text
-plan.submit:{"plan_id":"example","steps":[{"step_id":1,"tool":"TEST_RUN","capability":"test.run","args":{"argv":["python","--version"]}}]}
+plan.submit:{"plan_id":"example","steps":[{"step_id":1,"tool":"TEST_RUN","capability":"test.run","args":{"argv":["python","-m","pytest","-q"],"timeout_seconds":120,"cwd":"workspace"}}]}
 ```
 
 PATCH_APPLY example:
@@ -172,6 +172,10 @@ Current step-to-capability mapping:
 - `GIT_RUN` → `GIT_RUN`
 - `PATCH_APPLY` → `FS_WRITE_PATCH`
 - `PATCH_EDIT` → `FS_EDIT_PATCH`
+
+`TEST_RUN` supports explicit cwd modes:
+- `workspace` — run tests against the configured worktree/workspace
+- `app` — run tests against the application/runtime root
 
 Tokens are issued per approved step during execution.
 

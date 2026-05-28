@@ -1,5 +1,32 @@
 # Sprint History
 
+## Sprint G — Deterministic Improvement Engine Foundation
+
+Branch: `sprint-g-deterministic-improvement-engine`
+Status: Complete
+
+Goal:
+Allow the agent to improve development strategy across cycles using deterministic execution outcomes while preserving approval gates, deny-by-default policy, workspace isolation, and append-only auditability.
+
+Outcome:
+- `CycleOutcome` centralizes execution outcome vocabulary
+- inert strategy and strategy proposal data models added
+- append-only strategy registry added
+- deterministic strategy proposal engine added
+- post-cycle proposal hook added after execution summary/failure-envelope creation
+- strategy proposals do not auto-install
+- no policy, tool-surface, autonomy, or strategy-driven schema expansion
+- `TEST_RUN` cwd selection supports app-root and workspace-root testing
+
+Security boundary:
+- strategies are data only
+- registry is append-only
+- proposal generation is inert and auditable
+- human approval remains required for any future strategy installation
+- app/workspace/test roots remain explicitly separated
+
+---
+
 ## Sprint F — Controlled Autonomy Mode
 
 Branch: `agent-self-dev`
