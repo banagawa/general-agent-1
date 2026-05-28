@@ -516,18 +516,41 @@ General Guidance For TEST_RUN
 TEST_RUN is a separate tool step from PATCH_APPLY.
 
 When used:
-- capability should match the runtime's expected test capability
-- args should contain the explicit command vector
-- timeout should be explicit
+- capability must be test.run
+- args must contain explicit argv
+- timeout_seconds should be explicit
+- cwd should be explicit whenever test location matters
 
-Safe pattern:
+TEST_RUN supports only two cwd modes:
+- "workspace" — run tests from the configured workspace root
+- "app" — run tests from the application/runtime root
+
+No raw cwd paths are allowed.
+
+Default:
+- if cwd is omitted, runtime treats it as "workspace"
+
+Safe workspace-test pattern:
 {
   "step_id": 2,
   "tool": "TEST_RUN",
   "capability": "test.run",
   "args": {
-    "argv": ["pytest", "-q"],
-    "timeout_seconds": 120
+    "argv": ["python", "-m", "pytest", "-q"],
+    "timeout_seconds": 120,
+    "cwd": "workspace"
+  }
+}
+
+Safe app/runtime-test pattern:
+{
+  "step_id": 2,
+  "tool": "TEST_RUN",
+  "capability": "test.run",
+  "args": {
+    "argv": ["python", "-m", "pytest", "-q"],
+    "timeout_seconds": 120,
+    "cwd": "app"
   }
 }
 
@@ -538,7 +561,7 @@ When writing a new plan.submit payload:
 2. make every step explicit
 3. use the exact expected capability names
 4. for every PATCH_APPLY step, provide path and full new_content
-5. for every TEST_RUN step, provide explicit argv and timeout
+5. for every TEST_RUN step, provide explicit argv, timeout_seconds, and cwd when test location matters
 6. do not rely on implicit transformations
 7. do not rely on natural-language patch synthesis
 8. include simple plan metadata when it improves traceability, but keep it conservative

@@ -256,9 +256,17 @@ class ToolGateway:
         argv: Sequence[str],
         timeout_seconds: int = 30,
         cap_token_id: Optional[str] = None,
+        cwd: str = "workspace",
     ) -> Dict[str, Any]:
         assert_security_invariants(direct_tool_bypass=False)
         argv_list = list(argv)
+
+        if cwd not in {"workspace", "app"}:
+            return {
+                "ok": False,
+                "denied": True,
+                "reason": "TEST_RUN cwd must be 'workspace' or 'app'",
+            }
 
         vr = validate_token(
             token_id=cap_token_id,
@@ -266,11 +274,12 @@ class ToolGateway:
             context={"argv": argv_list},
         )
         if not vr.allowed:
-            reason = ";".join(vr.reasons)
+            reason = vr.reason
             log_event(
                 "CMD_RUN_DENIED",
                 {
                     "argv": argv_list,
+                    "cwd": cwd,
                     "token_id": vr.token_id,
                     "decision": "deny",
                     "reason": reason,
@@ -278,10 +287,11 @@ class ToolGateway:
             )
             return {"ok": False, "denied": True, "reason": reason}
 
-        app_root = get_app_root()
+        run_root = get_workspace_root() if cwd == "workspace" else get_app_root()
+
         res = run_cmd(
             argv=argv_list,
-            workspace_root=app_root,
+            workspace_root=run_root,
             timeout=int(timeout_seconds),
         )
 
@@ -289,7 +299,8 @@ class ToolGateway:
             "TEST_RUN_EXECUTED",
             {
                 "argv": argv_list,
-                "cwd": str(app_root),
+                "cwd": str(run_root),
+                "cwd_mode": cwd,
                 "timeout": int(timeout_seconds),
                 "exit_code": res.get("exit_code"),
                 "duration_ms": res.get("duration_ms"),
@@ -301,7 +312,7 @@ class ToolGateway:
             },
         )
         return {"ok": True, **res}
-    
+
     def git_run(
         self,
         argv: Sequence[str],
