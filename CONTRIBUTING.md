@@ -47,6 +47,18 @@ When updating docs, tests, or runtime behavior, keep capability mappings aligned
 
 PolicyEngine must enforce workspace boundaries and capability checks.
 
+### Runtime And Workspace Roots
+
+Contributors must keep root semantics explicit:
+
+- `app_root` is the authoritative runtime/security-code root.
+- `workspace_root` is the allowed mutation boundary.
+- `execution_root` is command/test cwd only.
+- `runtime_import_root` is where runtime modules are imported from.
+
+Do not derive workspace authority from cwd. Do not allow `app_root` and `workspace_root` to collapse. Use `AGENT_APP_ROOT` only to bind the authoritative runtime root for worktree-safe execution.
+
+
 ### Audit Everything
 
 Every tool invocation must log:

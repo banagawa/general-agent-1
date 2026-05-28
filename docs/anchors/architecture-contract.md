@@ -59,6 +59,21 @@ No tool may be invoked directly from the loop, planner, or orchestrator.
 
 ---
 
+## Runtime And Workspace Root Model
+
+The runtime uses explicit root semantics:
+
+- `app_root`: authoritative outer runtime and security-code root
+- `workspace_root`: mutation boundary for repository work and plan artifacts
+- `execution_root`: cwd used by command and test execution
+- `runtime_import_root`: source location for imported runtime modules
+
+`execution_root` may be inside a workspace worktree. It must not redefine runtime authority. `workspace_root` must be anchored to `app_root` or explicitly configured. `app_root`, `runtime_import_root`, and `workspace_root` must not collapse into the same mutable identity.
+
+`AGENT_APP_ROOT` is the explicit runtime-root binding used when worktree execution would otherwise make cwd ambiguous.
+
+---
+
 ## Security Model
 
 ### 1. Deny-by-default

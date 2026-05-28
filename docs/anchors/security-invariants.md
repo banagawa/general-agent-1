@@ -51,13 +51,21 @@ Required properties:
 
 ## 3. Workspace boundary isolation
 
-All filesystem mutation must remain inside `WORKSPACE_ROOT`.
+All filesystem mutation must remain inside `WORKSPACE_ROOT`. Runtime authority and mutation authority must remain separate.
 
 Required properties:
 - paths are canonicalized with `resolve()`
 - resolved paths are checked against workspace boundary
 - escape attempts deny
 - mutation outside workspace is forbidden
+- `app_root` is the authoritative runtime/security-code root
+- `workspace_root` is the mutation boundary
+- `execution_root` is command/test cwd only
+- `runtime_import_root` must not be derived from mutable workspace cwd
+- `workspace_root` must be app-root anchored or explicitly configured
+- cwd-relative workspace defaults are forbidden
+- `app_root` and `workspace_root` must never collapse
+- `AGENT_APP_ROOT` may bind runtime root for worktree-safe execution
 
 ---
 

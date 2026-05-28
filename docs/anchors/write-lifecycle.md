@@ -105,6 +105,8 @@ For all mutation:
 - ToolGateway is the choke point
 - PolicyEngine remains deny-by-default
 - workspace boundary is enforced on resolved path
+- `TEST_RUN` and command execution may use a workspace worktree cwd, but cwd is not runtime authority
+- runtime authority remains bound to `app_root` and may be made explicit with `AGENT_APP_ROOT`
 - token scope must match exact path for mutation
 - all allow/deny paths are audited
 - unexpected state fails closed

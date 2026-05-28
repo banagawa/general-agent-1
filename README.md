@@ -36,6 +36,8 @@ Both feed the same approval-bound execution path.
 
 Bounded autonomy remains approval-bound and feature-flag gated.
 
+Sprint F is complete. Current follow-up work is worktree runtime resolution hardening. Sprint G remains paused until runtime root and workspace root semantics are stable.
+
 Execution spine:
 
 Human
@@ -139,6 +141,19 @@ If preflight succeeds, execution transitions through the explicit execution stat
 - `APPROVED`
 - `IN_FLIGHT`
 - `EXECUTED` or `FAILED`
+
+---
+
+# Runtime Root Model
+
+The runtime distinguishes four roots:
+
+- `app_root`: authoritative outer runtime and security-code root
+- `workspace_root`: mutation boundary used by file, git, and plan artifacts
+- `execution_root`: current working directory used for command or test execution
+- `runtime_import_root`: source location for imported runtime modules
+
+`app_root` and `workspace_root` must never collapse. `workspace_root` must be anchored to `app_root` or explicitly configured, not derived from the current working directory. `AGENT_APP_ROOT` may be used to bind the authoritative runtime root during worktree-safe execution.
 
 ---
 
@@ -317,6 +332,8 @@ A rerun requires explicit new approval.
 | Sprint C | Complete |
 | Sprint D | Complete |
 | Sprint E | Complete |
+| Sprint F | Complete |
+| Sprint G | Paused for worktree runtime resolution hardening |
 
 ---
 
