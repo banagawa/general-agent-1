@@ -31,6 +31,7 @@ from .plan_store import (
     STATE_FAILED,
     STATE_IN_FLIGHT,
 )
+from .strategy_proposals import propose_strategy_from_execution
 from .workspace_fingerprint import compute_workspace_fingerprint
 
 TOKEN_ACTION_BY_TOOL = {
@@ -536,6 +537,11 @@ def _finalize_execution(
     )
 
     payload["failure_envelope"] = envelope
+
+    proposal = propose_strategy_from_execution(payload)
+    if proposal is not None:
+        payload["strategy_proposal"] = proposal.__dict__
+
     return payload
 
 def _created_paths_from_results(results: list[dict]) -> list[str]:

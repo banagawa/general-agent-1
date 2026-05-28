@@ -16,7 +16,7 @@ Current source of truth lives in:
 
 ## Sprint G Pause For Worktree Root Hardening
 
-Decision: DOCUMENTED PAUSE
+Decision: RESOLVED
 
 Reason:
-Sprint G execution exposed cwd-relative workspace root ambiguity under git worktree execution. No safety bypass, guard weakening, policy relaxation, or ToolGateway bypass is approved. Sprint G remains paused until runtime root and workspace root semantics are stable.
+Sprint G execution exposed cwd-relative workspace root ambiguity under git worktree execution. No safety bypass, guard weakening, policy relaxation, or ToolGateway bypass was approved. The resolution preserved the workspace guard, clarified app/workspace/test root semantics, and added explicit `TEST_RUN` cwd modes without allowing raw cwd paths. Sprint G resumed after runtime root and workspace root semantics were stabilized.

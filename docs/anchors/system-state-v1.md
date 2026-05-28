@@ -1,6 +1,6 @@
 # System State v1
 
-This document describes the merged system state after Sprint F plus the current typed mutation and worktree-safe root model.
+This document describes the merged system state after Sprint G plus the current typed mutation, worktree-safe root model, and deterministic strategy foundation.
 
 ---
 
@@ -262,7 +262,20 @@ Typed mutation audit events include:
 
 # Current Development State
 
-Sprint F is complete. Sprint G is paused until worktree runtime resolution hardening is merged and verified. No Sprint G strategy-engine behavior is treated as complete by this document.
+Sprint F is complete.
+
+Sprint G deterministic improvement foundation is complete.
+
+Current completed Sprint G behavior:
+- execution outcomes are normalized through `CycleOutcome`
+- strategy records and proposals are inert data
+- registry writes are append-only JSONL
+- proposal generation is deterministic from execution outcomes
+- proposal integration is post-cycle only
+- proposal generation does not auto-install strategies
+- `TEST_RUN` supports explicit cwd modes: `workspace` and `app`
+
+Future strategy installation remains approval-gated and out of scope for this completed foundation.
 
 ---
 

@@ -62,8 +62,11 @@ Current scoped use:
 
 - `PATCH_APPLY` → exact-path scope
 - `PATCH_EDIT` → exact-path scope
-- `TEST_RUN` → action-scoped
+- `FILE_CREATE` → exact-path scope
+- `TEST_RUN` → action-scoped `CMD_RUN`
 - `GIT_RUN` → action-scoped
+
+`TEST_RUN` may select only `cwd: "workspace"` or `cwd: "app"`. Raw cwd paths are not allowed.
 
 Exact-path scoped means the token is valid only for the resolved workspace path for the approved step.
 

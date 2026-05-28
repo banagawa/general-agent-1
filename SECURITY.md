@@ -41,7 +41,7 @@ Any action not explicitly allowed by policy must be denied.
 
 3. Workspace Boundary
 
-Filesystem access must remain within WORKSPACE_ROOT. Runtime identity and workspace identity must remain separate. `app_root` is the authoritative runtime/security-code root, while `workspace_root` is the mutation boundary. `execution_root` may be a worktree cwd for tests or commands, but it is not authority for runtime identity. `workspace_root` must be app-root anchored or explicitly configured; cwd-relative workspace defaults are forbidden. `AGENT_APP_ROOT` may bind the authoritative runtime root for worktree-safe execution.
+Filesystem access must remain within WORKSPACE_ROOT. Runtime identity and workspace identity must remain separate. `app_root` is the authoritative runtime/security-code root, while `workspace_root` is the mutation boundary. `execution_root` may be a worktree cwd for tests or commands, but it is not authority for runtime identity. `TEST_RUN` may choose only `cwd: "workspace"` or `cwd: "app"`; raw cwd paths are forbidden. `workspace_root` must be app-root anchored or explicitly configured; cwd-relative workspace defaults are forbidden. `AGENT_APP_ROOT` may bind the authoritative runtime root for worktree-safe execution.
 
 4. Typed Mutation Model
 

@@ -117,6 +117,8 @@ Current mappings:
 
 Mutation tokens must remain exact-path scoped.
 
+`TEST_RUN` may select only `cwd: "workspace"` or `cwd: "app"`; raw cwd paths are forbidden.
+
 ---
 
 ## 6. Approval-bound execution
@@ -133,7 +135,22 @@ Planner-generated plans are proposals only and do not bypass approval.
 
 ---
 
-## 7. Drift binding
+## 7. Strategy data boundary
+
+Sprint G strategy behavior must remain inert unless explicitly approved by a later workflow.
+
+Required properties:
+- strategies are data only
+- strategy proposals do not execute tools
+- strategy proposals do not mutate policy
+- strategy proposals do not modify plan schema
+- strategy proposals do not expand autonomy
+- strategy registry records are append-only
+- automatic strategy installation is forbidden
+
+---
+
+## 8. Drift binding
 
 Approval binds to workspace state.
 

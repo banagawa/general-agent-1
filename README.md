@@ -36,7 +36,22 @@ Both feed the same approval-bound execution path.
 
 Bounded autonomy remains approval-bound and feature-flag gated.
 
-Sprint F is complete. Current follow-up work is worktree runtime resolution hardening. Sprint G remains paused until runtime root and workspace root semantics are stable.
+Sprint F is complete.
+
+Sprint G was temporarily paused during worktree runtime resolution hardening while app_root/workspace_root semantics were stabilized.
+
+Sprint G deterministic improvement foundation is now complete.
+
+Current Sprint G behavior:
+- execution outcomes are normalized through `CycleOutcome`
+- strategies and proposals are inert data only
+- strategy registry records are append-only JSONL
+- proposal generation is deterministic from execution outcomes
+- proposal hook is post-cycle only and does not auto-install strategies
+
+Runtime test execution supports explicit TEST_RUN cwd selection:
+- `cwd: "workspace"` tests the configured workspace/worktree
+- `cwd: "app"` tests the runtime application root
 
 Execution spine:
 
@@ -86,10 +101,34 @@ Planner metadata is recorded on the plan:
 
 Use `plan.submit` when you want to submit explicit PLAN JSON.
 
+Before submitting, approving, or executing a workspace-targeted plan from the outer app repo, bind the workspace root to the intended worktree:
+
+```bash
+cd /c/Users/Bryan/Documents/general-agent-1
+unset PYTHONPATH
+export AGENT_WORKSPACE_ROOT="$PWD/workspace/general-agent-1-dev"
+```
+
+Verify the binding before running plan commands:
+
+```bash
+python - <<'PY'
+from pathlib import Path
+from sandbox.mounts import get_workspace_root
+
+ws = Path(get_workspace_root())
+print(ws)
+print((ws / "docs").exists())
+print((ws / "tests").exists())
+PY
+```
+
+Do not rely on the default workspace root for repo-targeted plans; the default may resolve to the workspace container directory rather than the `general-agent-1-dev` worktree.
+
 Simple test example:
 
 ```text
-plan.submit:{"plan_id":"example","steps":[{"step_id":1,"tool":"TEST_RUN","capability":"test.run","args":{"argv":["python","--version"]}}]}
+plan.submit:{"plan_id":"example","steps":[{"step_id":1,"tool":"TEST_RUN","capability":"test.run","args":{"argv":["python","-m","pytest","-q"],"timeout_seconds":120,"cwd":"workspace"}}]}
 ```
 
 PATCH_APPLY example:
@@ -187,7 +226,9 @@ Current step-to-capability mapping:
 - `GIT_RUN` → `GIT_RUN`
 - `PATCH_APPLY` → `FS_WRITE_PATCH`
 - `PATCH_EDIT` → `FS_EDIT_PATCH`
-- `FILE_CREATE ` → `FS_CREATE_FILE`
+- `FILE_CREATE` → `FS_CREATE_FILE`
+
+`TEST_RUN` may choose only `cwd: "workspace"` or `cwd: "app"`; raw cwd paths are forbidden.
 
 ---
 
@@ -333,12 +374,12 @@ A rerun requires explicit new approval.
 | Sprint D | Complete |
 | Sprint E | Complete |
 | Sprint F | Complete |
-| Sprint G | Paused for worktree runtime resolution hardening |
+| Sprint G | Complete |
 
 ---
 
 # Next Phase
 
-Sprint F: Controlled Autonomy Mode
+Sprint H: Workspace Intelligence Layer
 
-That phase is not described here as merged runtime behavior.
+Sprint H is not described here as merged runtime behavior.
