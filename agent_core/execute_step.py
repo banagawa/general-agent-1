@@ -49,6 +49,7 @@ def execute_step(gateway, step):
             argv=step.args["argv"],
             timeout_seconds=step.args.get("timeout_seconds", 30),
             cap_token_id=step.args.get("cap_token_id"),
+            cwd=step.args.get("cwd", "workspace"),
         )
 
     raise ValueError(f"unknown tool: {step.tool}")

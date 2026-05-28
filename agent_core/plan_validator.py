@@ -105,10 +105,13 @@ def _validate_patch_edit(step: ToolStep) -> None:
     if "argv" in step.args:
         raise ValueError("PATCH_EDIT must not include args.argv")
 
-
 def _validate_test_run(step: ToolStep) -> None:
     _require_argv(step.args, "TEST_RUN")
     _require_timeout_if_present(step.args, "TEST_RUN")
+
+    cwd = step.args.get("cwd", "workspace")
+    if cwd not in {"workspace", "app"}:
+        raise ValueError("TEST_RUN cwd must be 'workspace' or 'app'")
 
 def _validate_file_create(step: ToolStep) -> None:
     path = step.args.get("path")
