@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from sandbox.mounts import get_app_root, get_workspace_root
 from audit.log import log_event
 from policy.capabilities import validate_token
 from policy.engine import PolicyEngine
@@ -256,12 +257,51 @@ class ToolGateway:
         timeout_seconds: int = 30,
         cap_token_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        return self.cmd_run(
-            argv=argv,
-            timeout_seconds=timeout_seconds,
-            cap_token_id=cap_token_id,
+        assert_security_invariants(direct_tool_bypass=False)
+        argv_list = list(argv)
+
+        vr = validate_token(
+            token_id=cap_token_id,
+            action="CMD_RUN",
+            context={"argv": argv_list},
+        )
+        if not vr.allowed:
+            reason = ";".join(vr.reasons)
+            log_event(
+                "CMD_RUN_DENIED",
+                {
+                    "argv": argv_list,
+                    "token_id": vr.token_id,
+                    "decision": "deny",
+                    "reason": reason,
+                },
+            )
+            return {"ok": False, "denied": True, "reason": reason}
+
+        app_root = get_app_root()
+        res = run_cmd(
+            argv=argv_list,
+            workspace_root=app_root,
+            timeout=int(timeout_seconds),
         )
 
+        log_event(
+            "TEST_RUN_EXECUTED",
+            {
+                "argv": argv_list,
+                "cwd": str(app_root),
+                "timeout": int(timeout_seconds),
+                "exit_code": res.get("exit_code"),
+                "duration_ms": res.get("duration_ms"),
+                "stdout_truncated": res.get("stdout_truncated"),
+                "stderr_truncated": res.get("stderr_truncated"),
+                "timed_out": res.get("timed_out"),
+                "token_id": vr.token_id,
+                "decision": "allow",
+            },
+        )
+        return {"ok": True, **res}
+    
     def git_run(
         self,
         argv: Sequence[str],
