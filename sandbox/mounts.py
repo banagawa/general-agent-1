@@ -4,27 +4,42 @@ import os
 from pathlib import Path
 
 
-def get_app_root() -> Path:
-    raw = os.getenv("AGENT_APP_ROOT")
-    if raw:
-        return Path(raw).expanduser().resolve()
-
+def _module_repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def _looks_like_app_root(path: Path) -> bool:
+    return (path / "main.py").is_file() and (path / "sandbox").is_dir()
+
+
+def get_app_root() -> Path:
+    env_root = os.environ.get("AGENT_APP_ROOT")
+    if env_root:
+        return Path(env_root).resolve()
+
+    module_root = _module_repo_root().resolve()
+
+    # When tests are run from a git worktree under:
+    #   <app_root>/workspace/<worktree>
+    # the imported module root is the worktree, not the outer app root.
+    # Infer the outer app root so the live-app guard does not falsely trip.
+    if module_root.parent.name == "workspace":
+        candidate = module_root.parent.parent.resolve()
+        if _looks_like_app_root(candidate):
+            return candidate
+
+    return module_root
+
+
 def get_workspace_root() -> Path:
-    app_root = get_app_root()
-
-    raw = os.getenv("AGENT_WORKSPACE_ROOT") or os.getenv("AGENT_WORKSPACE")
-
-    if raw:
-        root = Path(raw).expanduser().resolve()
-    else:
-        root = (app_root / "workspace").resolve()
+    root = Path(
+        os.environ.get(
+            "AGENT_WORKSPACE_ROOT",
+            str(get_app_root() / "workspace"),
+        )
+    ).resolve()
 
     _assert_not_live_app_repo(root)
-
-    root.mkdir(parents=True, exist_ok=True)
     return root
 
 
