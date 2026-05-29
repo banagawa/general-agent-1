@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from sandbox.mounts import get_app_root, get_workspace_root
 from audit.log import log_event
 from policy.capabilities import validate_token
+from policy.cmd_policy import validate_test_run_argv
 from policy.engine import PolicyEngine
 from sandbox.mounts import get_workspace_root
 from tools.cmd_tools import run_cmd
@@ -262,11 +263,33 @@ class ToolGateway:
         argv_list = list(argv)
 
         if cwd not in {"workspace", "app"}:
+            log_event(
+                "TEST_RUN_DENIED",
+                {
+                    "argv": argv_list,
+                    "cwd": cwd,
+                    "decision": "deny",
+                    "reason": "TEST_RUN cwd must be 'workspace' or 'app'",
+                },
+            )
             return {
                 "ok": False,
                 "denied": True,
                 "reason": "TEST_RUN cwd must be 'workspace' or 'app'",
             }
+
+        test_policy = validate_test_run_argv(argv_list)
+        if not test_policy.allowed:
+            log_event(
+                "TEST_RUN_DENIED",
+                {
+                    "argv": argv_list,
+                    "cwd": cwd,
+                    "decision": "deny",
+                    "reason": test_policy.reason,
+                },
+            )
+            return {"ok": False, "denied": True, "reason": test_policy.reason}
 
         vr = validate_token(
             token_id=cap_token_id,

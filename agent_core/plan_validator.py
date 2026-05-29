@@ -1,4 +1,5 @@
 from .plan_schema import Plan, ToolStep
+from policy.cmd_policy import validate_test_run_argv
 
 MAX_STEPS_PER_PLAN = 25
 
@@ -112,6 +113,10 @@ def _validate_test_run(step: ToolStep) -> None:
     cwd = step.args.get("cwd", "workspace")
     if cwd not in {"workspace", "app"}:
         raise ValueError("TEST_RUN cwd must be 'workspace' or 'app'")
+
+    decision = validate_test_run_argv(step.args.get("argv"))
+    if not decision.allowed:
+        raise ValueError(f"TEST_RUN argv denied: {decision.reason}")
 
 def _validate_file_create(step: ToolStep) -> None:
     path = step.args.get("path")
