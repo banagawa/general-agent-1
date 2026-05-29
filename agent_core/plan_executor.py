@@ -13,6 +13,7 @@ from .plan_hash import compute_plan_hash
 from .plan_validator import validate_plan
 from agent_core.preflight import preflight_execute
 from .plan_store import (
+    load_pending_plan,
     load_approved_plan,
     load_approved_plan_meta,
     mark_plan_approved,
@@ -73,11 +74,10 @@ def submit_plan(plan):
 
 
 def approve_plan(plan_hash: str):
-    mark_plan_approved(plan_hash)
+    plan = load_pending_plan(plan_hash)
+    validate_plan_approval_gate(plan)
 
-    plan = load_approved_plan(plan_hash)
-    if plan is None:
-        raise RuntimeError("approved plan not found")
+    mark_plan_approved(plan_hash)
 
     fingerprint = compute_workspace_fingerprint()
 
@@ -133,6 +133,59 @@ def _utc_now_iso() -> str:
 
 def _new_tx_id(plan_hash: str) -> str:
     return f"{plan_hash[:12]}-{int(time.time())}"
+
+def _resolve_workspace_plan_path(path_value: str) -> Path:
+    from sandbox.mounts import get_workspace_root
+
+    if not isinstance(path_value, str) or not path_value.strip():
+        raise ValueError("mutation path must be non-empty string")
+
+    raw_path = Path(path_value)
+    if raw_path.is_absolute():
+        raise ValueError(f"mutation path must be relative: {path_value}")
+    if any(part == ".." for part in raw_path.parts):
+        raise ValueError(f"mutation path must not contain parent traversal: {path_value}")
+
+    workspace_root = get_workspace_root().resolve()
+    resolved_path = (workspace_root / raw_path).resolve()
+
+    try:
+        resolved_path.relative_to(workspace_root)
+    except ValueError as exc:
+        raise ValueError(f"mutation path escapes workspace: {path_value}") from exc
+
+    return resolved_path
+
+
+def validate_plan_approval_gate(plan) -> None:
+    """
+    Validate mutation tool/file-state alignment before manual approval succeeds.
+
+    This keeps the approval gate aligned with typed mutation semantics:
+    - PATCH_APPLY replaces existing files only.
+    - PATCH_EDIT edits existing files only.
+    - FILE_CREATE creates new files only.
+    """
+
+    for step in getattr(plan, "steps", ()): 
+        if step.tool not in {"PATCH_APPLY", "PATCH_EDIT", "FILE_CREATE"}:
+            continue
+
+        relative_path = step.args.get("path")
+        target_path = _resolve_workspace_plan_path(relative_path)
+
+        if step.tool in {"PATCH_APPLY", "PATCH_EDIT"}:
+            if not target_path.exists():
+                raise ValueError(f"{step.tool} target does not exist: {relative_path}")
+            if not target_path.is_file():
+                raise ValueError(f"{step.tool} target is not a file: {relative_path}")
+
+        if step.tool == "FILE_CREATE":
+            if target_path.exists():
+                raise ValueError(f"FILE_CREATE target already exists: {relative_path}")
+            if not target_path.parent.exists():
+                raise ValueError(f"FILE_CREATE parent does not exist: {relative_path}")
+
 
 
 def _issue_step_token(step):
