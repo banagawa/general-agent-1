@@ -105,3 +105,22 @@ def test_pending_patch_store_is_currently_cwd_relative_runtime_bookkeeping(tmp_p
 
 def test_runtime_state_ownership_contract_has_no_production_behavior_change():
     assert capabilities.AUDIT_DIR == Path(".audit")
+
+def test_runtime_state_directory_is_excluded_from_workspace_fingerprint(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("AGENT_WORKSPACE_ROOT", str(workspace))
+
+    source_file = workspace / "tracked_source.py"
+    source_file.write_text("VALUE = 1\\n", encoding="utf-8")
+
+    before = compute_workspace_fingerprint()
+
+    runtime_dir = workspace / ".runtime_state" / "audit"
+    runtime_dir.mkdir(parents=True)
+    (runtime_dir / "audit.jsonl").write_text('{"event":"runtime"}\\n', encoding="utf-8")
+    (runtime_dir / "capability_tokens.json").write_text("{}\\n", encoding="utf-8")
+
+    after = compute_workspace_fingerprint()
+
+    assert after == before

@@ -52,6 +52,12 @@ Examples:
 
 These files are runtime records, not source workspace content.
 
+## Runtime-state fingerprint exclusion
+
+The workspace fingerprint excludes `.runtime_state/`.
+
+This creates a safe future landing zone for runtime bookkeeping without causing workspace drift. It does not move any current audit or token files.
+
 ## Current unresolved question
 
 The unresolved question is whether `.audit/` should remain cwd-relative or move to an explicit runtime-state root.
@@ -74,6 +80,5 @@ This contract does not:
 
 - move audit logs
 - move token stores
-- change fingerprint rules
 - change plan storage
 - add a new subsystem
