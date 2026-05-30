@@ -25,6 +25,28 @@ def _require_non_empty_string(value, field_name: str) -> None:
         raise ValueError(f"{field_name} must be non-empty string")
 
 
+def _require_safe_relative_path(value: str, field_name: str) -> None:
+    _require_non_empty_string(value, field_name)
+
+    if "\x00" in value:
+        raise ValueError(f"{field_name} must not contain null bytes")
+
+    normalized = value.replace("\\", "/")
+    parts = normalized.split("/")
+
+    if value.startswith(("/", "\\")):
+        raise ValueError(f"{field_name} must be workspace-relative")
+
+    if len(value) >= 2 and value[1] == ":":
+        raise ValueError(f"{field_name} must not include drive letters")
+
+    if normalized.startswith("//"):
+        raise ValueError(f"{field_name} must not be UNC path")
+
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError(f"{field_name} must not contain empty, dot, or parent parts")
+
+
 def _require_argv(args: dict, tool_name: str) -> None:
     argv = args.get("argv")
     if not isinstance(argv, list) or len(argv) == 0:
@@ -50,7 +72,7 @@ def _validate_patch_apply(step: ToolStep) -> None:
     path = step.args.get("path")
     new_content = step.args.get("new_content")
 
-    _require_non_empty_string(path, "PATCH_APPLY args.path")
+    _require_safe_relative_path(path, "PATCH_APPLY args.path")
 
     if not isinstance(new_content, str):
         raise ValueError("PATCH_APPLY args.new_content must be string")
@@ -64,7 +86,7 @@ def _validate_patch_edit(step: ToolStep) -> None:
     edits = step.args.get("edits")
     expected_file_sha256_before = step.args.get("expected_file_sha256_before")
 
-    _require_non_empty_string(path, "PATCH_EDIT args.path")
+    _require_safe_relative_path(path, "PATCH_EDIT args.path")
 
     if not isinstance(edits, list) or len(edits) == 0:
         raise ValueError("PATCH_EDIT args.edits must be non-empty list")
@@ -122,7 +144,7 @@ def _validate_file_create(step: ToolStep) -> None:
     path = step.args.get("path")
     content = step.args.get("content")
 
-    _require_non_empty_string(path, "FILE_CREATE args.path")
+    _require_safe_relative_path(path, "FILE_CREATE args.path")
 
     if not isinstance(content, str):
         raise ValueError("FILE_CREATE args.content must be string")

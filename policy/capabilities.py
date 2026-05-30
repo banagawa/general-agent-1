@@ -191,24 +191,69 @@ def validate_token(
     return ValidationResult(True, None, token_id)
 
 
+def _workspace_bound_path(value: Any) -> Optional[Path]:
+    if value is None:
+        return None
+
+    raw = str(value)
+    if not raw.strip():
+        return None
+
+    try:
+        from sandbox.mounts import get_workspace_root
+
+        workspace_root = get_workspace_root().resolve()
+        candidate = Path(raw)
+        if not candidate.is_absolute():
+            candidate = workspace_root / candidate
+
+        resolved = candidate.resolve()
+        resolved.relative_to(workspace_root)
+        return resolved
+    except Exception:
+        return None
+
+
+def _path_scope_allows(scope_value: Any, ctx_value: Any, *, prefix: bool) -> bool:
+    expected = _workspace_bound_path(scope_value)
+    actual = _workspace_bound_path(ctx_value)
+
+    if expected is None or actual is None:
+        return False
+
+    if prefix:
+        try:
+            actual.relative_to(expected)
+            return True
+        except ValueError:
+            return False
+
+    return actual == expected
+
+
 def _scope_allows(scope: Dict[str, Any], ctx: Dict[str, Any]) -> bool:
     """
-    Minimal scope model for A5:
-    - If scope contains {"path": "..."} then ctx["path"] must match exactly.
-    - If scope contains {"path_prefix": "..."} then ctx["path"] must startwith it.
-    - If no recognized scope keys exist, allow (scope is empty / non-path-based).
+    Fail-closed scope model:
+    - empty scope is allowed for non-path actions
+    - relative path scopes resolve under workspace_root, never cwd
+    - absolute path scopes must still resolve inside workspace_root
+    - path scope requires exact resolved path match
+    - path_prefix scope requires resolved relative_to containment
+    - unknown scope keys deny instead of silently allowing
     """
     if not scope:
         return True
 
-    ctx_path = str(ctx.get("path") or "")
+    recognized = {"path", "path_prefix"}
+    if set(scope.keys()) - recognized:
+        return False
+
+    ctx_path = ctx.get("path")
 
     if "path" in scope:
-        return ctx_path == str(scope["path"])
+        return _path_scope_allows(scope["path"], ctx_path, prefix=False)
 
     if "path_prefix" in scope:
-        return ctx_path.startswith(str(scope["path_prefix"]))
+        return _path_scope_allows(scope["path_prefix"], ctx_path, prefix=True)
 
-    # Unknown scope keys: for A5 we allow them (future extension),
-    # but callers should use recognized keys for enforcement.
-    return True
+    return False
