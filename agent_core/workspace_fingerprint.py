@@ -6,6 +6,9 @@ from pathlib import Path
 from sandbox.mounts import get_workspace_root
 
 
+FINGERPRINT_EXCLUDED_TOP_LEVEL_DIRS = {"plans", ".runtime_state"}
+
+
 def _hash_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -24,7 +27,7 @@ def compute_workspace_fingerprint() -> str:
 
         parts = path.relative_to(workspace).parts
 
-        if parts and parts[0] == "plans":
+        if parts and parts[0] in FINGERPRINT_EXCLUDED_TOP_LEVEL_DIRS:
             continue
         if "__pycache__" in parts:
             continue
