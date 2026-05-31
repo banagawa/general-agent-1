@@ -6,8 +6,14 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 
-AUDIT_DIR = Path(".audit")
-AUDIT_FILE = AUDIT_DIR / "audit.jsonl"
+def _audit_dir() -> Path:
+    from sandbox.mounts import get_runtime_state_root
+
+    return get_runtime_state_root() / "audit"
+
+
+def _audit_file() -> Path:
+    return _audit_dir() / "audit.jsonl"
 
 
 def log_event(event: str, meta: Optional[Dict[str, Any]] = None) -> None:
@@ -20,7 +26,9 @@ def log_event(event: str, meta: Optional[Dict[str, Any]] = None) -> None:
 
     This is additive-only and keeps older log consumers working.
     """
-    AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+    audit_dir = _audit_dir()
+    audit_file = _audit_file()
+    audit_dir.mkdir(parents=True, exist_ok=True)
 
     meta = meta or {}
 
@@ -36,5 +44,5 @@ def log_event(event: str, meta: Optional[Dict[str, Any]] = None) -> None:
         "detail": meta,
     }
 
-    with AUDIT_FILE.open("a", encoding="utf-8") as f:
+    with audit_file.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")

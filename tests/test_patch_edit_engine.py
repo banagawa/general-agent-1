@@ -27,16 +27,16 @@ def isolated_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
-def _read_audit_events(cwd: Path) -> list[dict]:
-    audit_file = cwd / ".audit" / "audit.jsonl"
+def _read_audit_events(workspace: Path) -> list[dict]:
+    audit_file = workspace.parent / "agent_runtime" / workspace.name / "audit" / "audit.jsonl"
     assert audit_file.exists(), "audit file missing"
     lines = audit_file.read_text(encoding="utf-8").splitlines()
     assert lines, "audit file empty"
     return [json.loads(line) for line in lines]
 
 
-def _last_event(cwd: Path, event_name: str) -> dict:
-    events = _read_audit_events(cwd)
+def _last_event(workspace: Path, event_name: str) -> dict:
+    events = _read_audit_events(workspace)
     for e in reversed(events):
         if e.get("event") == event_name:
             return e
@@ -70,7 +70,7 @@ def test_gateway_patch_edit_executes_exact_single_match(
     assert res["changed"] is True
     assert p.read_text(encoding="utf-8") == "hello new world\n"
 
-    e = _last_event(isolated_repo, "PATCH_EDIT_EXECUTED")
+    e = _last_event(workspace, "PATCH_EDIT_EXECUTED")
     meta = e.get("meta") or {}
     assert meta.get("path") == str(p)
     assert meta.get("decision") == "allow"

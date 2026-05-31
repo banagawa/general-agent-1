@@ -24,8 +24,8 @@ def isolated_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
-def _read_audit_events(repo_root: Path) -> list[dict]:
-    audit_dir = repo_root / ".audit"
+def _read_audit_events(workspace: Path) -> list[dict]:
+    audit_dir = workspace.parent / "agent_runtime" / workspace.name / "audit"
     events: list[dict] = []
 
     if not audit_dir.exists():
@@ -47,7 +47,7 @@ def test_replay_denial_emits_reason_code(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    _set_workspace(monkeypatch, tmp_path)
+    workspace = _set_workspace(monkeypatch, tmp_path)
 
     from agent_core.plan_schema import Plan, ToolStep
     from agent_core.plan_executor import submit_plan, approve_plan, execute_plan
@@ -82,7 +82,7 @@ def test_replay_denial_emits_reason_code(
     with pytest.raises(RuntimeError, match="approved plan already executed"):
         execute_plan(gw, plan_hash)
 
-    events = _read_audit_events(isolated_repo)
+    events = _read_audit_events(workspace)
 
     deny_events = [
         e for e in events
@@ -139,7 +139,7 @@ def test_workspace_drift_denial_emits_reason_code(
     with pytest.raises(RuntimeError, match="workspace drift detected"):
         execute_plan(gw, plan_hash)
 
-    events = _read_audit_events(isolated_repo)
+    events = _read_audit_events(workspace)
 
     deny_events = [
         e for e in events
