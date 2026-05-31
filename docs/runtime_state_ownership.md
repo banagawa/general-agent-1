@@ -54,15 +54,25 @@ These files are runtime records, not source workspace content.
 
 ## Runtime-state root
 
-The runtime-state root is `workspace_root/.runtime_state`.
+The runtime-state root is a visible sibling runtime area under the workspace container:
+
+`workspace/agent_runtime/<workspace_name>`
+
+For the current development worktree, that means:
+
+`workspace/agent_runtime/general-agent-1-dev`
 
 The helper `get_runtime_state_root()` exposes this location without moving current stores.
 
+This keeps the live app root clean and keeps runtime bookkeeping outside the target worktree.
+
 ## Runtime-state fingerprint exclusion
 
-The workspace fingerprint excludes `.runtime_state/`.
+The workspace fingerprint excludes `.runtime_state/` for compatibility with the earlier bridge design.
 
-This creates a safe future landing zone for runtime bookkeeping without causing workspace drift. It does not move any current audit or token files.
+The preferred runtime-state location is now outside the target worktree at `workspace/agent_runtime/<workspace_name>`, so future runtime bookkeeping should not participate in target workspace fingerprints at all.
+
+This does not move any current audit or token files.
 
 ## Current unresolved question
 

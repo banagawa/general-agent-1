@@ -45,13 +45,22 @@ def get_workspace_root() -> Path:
 
 def get_runtime_state_root() -> Path:
     """
-    Return the workspace-scoped runtime-state root.
+    Return the runtime-state root for the active workspace.
 
-    This is a future landing zone for runtime bookkeeping such as audit logs,
-    capability token state, and pending patch state. Existing stores are not
-    migrated by this helper alone.
+    Runtime state is stored outside the live app root and outside the target
+    worktree. For a workspace at:
+
+        <app_root>/workspace/<workspace_name>
+
+    runtime state lives at:
+
+        <app_root>/workspace/agent_runtime/<workspace_name>
+
+    Existing stores are not migrated by this helper alone.
     """
-    return get_workspace_root() / ".runtime_state"
+    workspace_root = get_workspace_root()
+    workspace_container = workspace_root.parent
+    return workspace_container / "agent_runtime" / workspace_root.name
 
 
 def _assert_not_live_app_repo(root: Path) -> None:
