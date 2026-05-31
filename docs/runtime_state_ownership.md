@@ -100,9 +100,20 @@ Historical plan artifacts that already exist under a target worktree are not mig
 
 The ownership details and future migration notes are documented in `docs/plan_artifact_ownership.md`.
 
-## Future runtime history operations
+## Runtime history health monitoring
 
-Future work should include read-only disk/history health checks before any cleanup or retention behavior.
+Runtime history health monitoring is implemented as read-only inspection.
+
+The helper `get_runtime_history_health()` reports total bytes, file count, and warning reason codes for the runtime-state root.
+
+Warning reason codes:
+
+- `RUNTIME_HISTORY_SIZE_WARNING`
+- `RUNTIME_HISTORY_FILE_COUNT_WARNING`
+
+The helper does not delete, compact, archive, migrate, or rewrite runtime history.
+
+## Future runtime history operations
 
 Documented but not implemented yet:
 
@@ -113,9 +124,6 @@ Documented but not implemented yet:
 - compaction policy
 - integrity verification
 - checksum verification
-- disk usage health monitoring
-
-Initial health checks should be warning-only and should not delete, compact, archive, or migrate data automatically.
 
 ## Non-goals
 

@@ -29,5 +29,7 @@ def test_future_runtime_history_operations_are_documented_but_not_implemented():
 
     assert "runtime migration tool" in text
     assert "runtime export tool" in text
-    assert "disk usage health monitoring" in text
+    assert "Runtime history health monitoring" in text
+    assert "RUNTIME_HISTORY_SIZE_WARNING" in text
+    assert "RUNTIME_HISTORY_FILE_COUNT_WARNING" in text
     assert "No cleanup, deletion, compaction, or retention enforcement" in text

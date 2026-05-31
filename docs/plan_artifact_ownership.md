@@ -85,6 +85,25 @@ It does not automatically migrate historical plan artifacts that already exist u
 
 A future runtime migration tool should handle historical data explicitly.
 
+## Runtime history health monitoring
+
+Runtime history health monitoring is implemented as read-only inspection.
+
+The helper `get_runtime_history_health()` reports:
+
+- runtime-state root
+- whether the root exists
+- total bytes
+- file count
+- warning reason codes
+
+Warning reason codes:
+
+- `RUNTIME_HISTORY_SIZE_WARNING`
+- `RUNTIME_HISTORY_FILE_COUNT_WARNING`
+
+The helper does not delete, compact, archive, migrate, or rewrite runtime history.
+
 ## Future runtime history operations
 
 The following are intentionally not implemented yet:
@@ -96,21 +115,5 @@ The following are intentionally not implemented yet:
 - compaction policy
 - integrity verification
 - checksum verification
-- disk usage health monitoring
-
-Future disk/history health checks should be read-only at first.
-
-Suggested checks:
-
-- total runtime-history bytes
-- runtime-history file count
-- largest artifact
-- oldest artifact
-- newest artifact
-
-Suggested warning reason codes:
-
-- `RUNTIME_HISTORY_SIZE_WARNING`
-- `RUNTIME_HISTORY_FILE_COUNT_WARNING`
 
 No cleanup, deletion, compaction, or retention enforcement should happen without an explicit future design.
