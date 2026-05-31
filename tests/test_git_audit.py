@@ -28,16 +28,16 @@ def isolated_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
-def _read_audit_events(cwd: Path) -> list[dict]:
-    audit_file = cwd / ".audit" / "audit.jsonl"
+def _read_audit_events(workspace: Path) -> list[dict]:
+    audit_file = workspace.parent / "agent_runtime" / workspace.name / "audit" / "audit.jsonl"
     assert audit_file.exists(), "audit file missing"
     lines = audit_file.read_text(encoding="utf-8").splitlines()
     assert lines, "audit file empty"
     return [json.loads(line) for line in lines]
 
 
-def _last_event(cwd: Path, event_name: str) -> dict:
-    events = _read_audit_events(cwd)
+def _last_event(workspace: Path, event_name: str) -> dict:
+    events = _read_audit_events(workspace)
     for e in reversed(events):
         if e.get("event") == event_name:
             return e
@@ -45,21 +45,21 @@ def _last_event(cwd: Path, event_name: str) -> dict:
 
 
 def test_git_run_denied_is_audited(isolated_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    _set_workspace(monkeypatch, tmp_path)
+    workspace = _set_workspace(monkeypatch, tmp_path)
     gw = _make_gateway()
 
     res = gw.git_run(["git", "push"])
     assert res["ok"] is False
     assert res.get("denied") is True
 
-    e = _last_event(isolated_repo, "GIT_RUN_DENIED")
+    e = _last_event(workspace, "GIT_RUN_DENIED")
     meta = e.get("meta") or {}
     assert meta.get("decision") == "deny"
     assert meta.get("argv") == ["git", "push"]
 
 
 def test_git_run_executed_is_audited(isolated_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    _set_workspace(monkeypatch, tmp_path)
+    workspace = _set_workspace(monkeypatch, tmp_path)
     gw = _make_gateway()
 
     tok = issue_token(actions=["GIT_RUN"], ttl_seconds=120)
@@ -67,7 +67,7 @@ def test_git_run_executed_is_audited(isolated_repo: Path, tmp_path: Path, monkey
     init = gw.git_run(["git", "init"], cap_token_id=tok.id)
     assert init["ok"] is True
 
-    e = _last_event(isolated_repo, "GIT_RUN_EXECUTED")
+    e = _last_event(workspace, "GIT_RUN_EXECUTED")
     meta = e.get("meta") or {}
     assert meta.get("decision") == "allow"
     assert meta.get("argv") == ["git", "init"]

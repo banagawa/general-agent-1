@@ -41,44 +41,50 @@ This means execution history is stored inside the workspace tree, but it is not 
 
 ## Runtime bookkeeping
 
-Runtime bookkeeping is currently cwd-relative under `.audit/`.
+Runtime bookkeeping is stored under the visible runtime-state root.
 
 Examples:
 
-- `.audit/audit.jsonl`
-- `.audit/capability_tokens.json`
-- `.audit/capability_revocations.json`
-- `.audit/pending_patches.json`
+- `agent_runtime/<workspace_name>/audit/audit.jsonl`
+- `agent_runtime/<workspace_name>/capabilities/capability_tokens.json`
+- `agent_runtime/<workspace_name>/capabilities/capability_revocations.json`
+- `agent_runtime/<workspace_name>/pending/pending_patches.json`
 
 These files are runtime records, not source workspace content.
 
+## Runtime-state root
+
+The runtime-state root is a visible sibling runtime area under the workspace container:
+
+`workspace/agent_runtime/<workspace_name>`
+
+For the current development worktree, that means:
+
+`workspace/agent_runtime/general-agent-1-dev`
+
+The helper `get_runtime_state_root()` exposes this location without moving current stores.
+
+This keeps the live app root clean and keeps runtime bookkeeping outside the target worktree.
+
 ## Runtime-state fingerprint exclusion
 
-The workspace fingerprint excludes `.runtime_state/`.
+The workspace fingerprint excludes `.runtime_state/` for compatibility with the earlier bridge design.
 
-This creates a safe future landing zone for runtime bookkeeping without causing workspace drift. It does not move any current audit or token files.
+The preferred runtime-state location is now outside the target worktree at `workspace/agent_runtime/<workspace_name>`, so future runtime bookkeeping should not participate in target workspace fingerprints at all.
 
-## Current unresolved question
+Audit logs, capability token state, and pending patch state now use the runtime-state root.
 
-The unresolved question is whether `.audit/` should remain cwd-relative or move to an explicit runtime-state root.
+## Migration result
 
-A previous direct migration to `workspace_root/.audit` caused broad failures because runtime writes under the workspace affected approval, execution, and drift semantics.
+Runtime bookkeeping now uses the explicit runtime-state root.
 
-## Future migration requirement
+The migration target is `workspace/agent_runtime/<workspace_name>/`, not `workspace_root/.audit`.
 
-Before `.audit/` moves, the repo must explicitly define:
-
-1. where runtime state lives
-2. whether runtime state participates in fingerprints
-3. how append-only audit history is preserved
-4. how tests isolate runtime bookkeeping
-5. how workspace drift detection ignores runtime-only writes without ignoring real source changes
+Because runtime bookkeeping is outside the target worktree, runtime writes do not create target workspace drift while source files remain protected by drift detection.
 
 ## Non-goals
 
 This contract does not:
 
-- move audit logs
-- move token stores
 - change plan storage
 - add a new subsystem

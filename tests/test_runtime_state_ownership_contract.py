@@ -45,66 +45,84 @@ def test_source_files_are_workspace_state_included_in_fingerprint(tmp_path, monk
     assert after != before
 
 
-def test_audit_log_is_currently_cwd_relative_runtime_bookkeeping(tmp_path, monkeypatch):
-    workspace = tmp_path / "workspace"
+def test_audit_log_uses_runtime_state_root(tmp_path, monkeypatch):
+    app_root = tmp_path / "app"
+    workspace_container = app_root / "workspace"
+    workspace = workspace_container / "project-a"
     cwd = tmp_path / "cwd"
+    app_root.mkdir()
+    workspace_container.mkdir()
     workspace.mkdir()
     cwd.mkdir()
 
+    monkeypatch.setenv("AGENT_APP_ROOT", str(app_root))
     monkeypatch.setenv("AGENT_WORKSPACE_ROOT", str(workspace))
     monkeypatch.chdir(cwd)
 
     log_event("RUNTIME_STATE_OWNERSHIP_CHECK", {"kind": "audit"})
 
-    audit_file = cwd / ".audit" / "audit.jsonl"
+    audit_file = workspace_container / "agent_runtime" / "project-a" / "audit" / "audit.jsonl"
     assert audit_file.is_file()
-    assert not (workspace / ".audit" / "audit.jsonl").exists()
+    assert not (cwd / ".audit").exists()
+    assert not (workspace / ".audit").exists()
 
     event = json.loads(audit_file.read_text(encoding="utf-8").splitlines()[-1])
     assert event["action"] == "RUNTIME_STATE_OWNERSHIP_CHECK"
     assert event["detail"] == {"kind": "audit"}
 
 
-def test_capability_tokens_are_currently_cwd_relative_runtime_bookkeeping(tmp_path, monkeypatch):
-    workspace = tmp_path / "workspace"
+def test_capability_tokens_use_runtime_state_root(tmp_path, monkeypatch):
+    app_root = tmp_path / "app"
+    workspace_container = app_root / "workspace"
+    workspace = workspace_container / "project-a"
     cwd = tmp_path / "cwd"
+    app_root.mkdir()
+    workspace_container.mkdir()
     workspace.mkdir()
     cwd.mkdir()
 
+    monkeypatch.setenv("AGENT_APP_ROOT", str(app_root))
     monkeypatch.setenv("AGENT_WORKSPACE_ROOT", str(workspace))
     monkeypatch.chdir(cwd)
 
     token = issue_token(actions={"FS_WRITE_PATCH"}, scope={})
 
-    token_file = cwd / ".audit" / "capability_tokens.json"
+    token_file = workspace_container / "agent_runtime" / "project-a" / "capabilities" / "capability_tokens.json"
     assert token_file.is_file()
+    assert not (cwd / ".audit" / "capability_tokens.json").exists()
     assert not (workspace / ".audit" / "capability_tokens.json").exists()
 
     data = json.loads(token_file.read_text(encoding="utf-8"))
     assert token.id in data
 
 
-def test_pending_patch_store_is_currently_cwd_relative_runtime_bookkeeping(tmp_path, monkeypatch):
-    workspace = tmp_path / "workspace"
+def test_pending_patch_store_uses_runtime_state_root(tmp_path, monkeypatch):
+    app_root = tmp_path / "app"
+    workspace_container = app_root / "workspace"
+    workspace = workspace_container / "project-a"
     cwd = tmp_path / "cwd"
+    app_root.mkdir()
+    workspace_container.mkdir()
     workspace.mkdir()
     cwd.mkdir()
 
+    monkeypatch.setenv("AGENT_APP_ROOT", str(app_root))
     monkeypatch.setenv("AGENT_WORKSPACE_ROOT", str(workspace))
     monkeypatch.chdir(cwd)
 
-    # Import after chdir because pending_store defines cwd-relative module constants.
-    import importlib
     import agent_core.pending_store as pending_store
 
-    pending_store = importlib.reload(pending_store)
+    pending_store.save_pending({})
 
-    assert pending_store.PENDING_FILE == Path(".audit") / "pending_patches.json"
+    assert (workspace_container / "agent_runtime" / "project-a" / "pending" / "pending_patches.json").is_file()
+    assert not (cwd / ".audit" / "pending_patches.json").exists()
     assert not (workspace / ".audit" / "pending_patches.json").exists()
 
 
-def test_runtime_state_ownership_contract_has_no_production_behavior_change():
-    assert capabilities.AUDIT_DIR == Path(".audit")
+def test_runtime_state_ownership_contract_has_migrated_runtime_bookkeeping():
+    from sandbox.mounts import get_runtime_state_root
+
+    assert capabilities._capability_dir() == get_runtime_state_root() / "capabilities"
 
 def test_runtime_state_directory_is_excluded_from_workspace_fingerprint(tmp_path, monkeypatch):
     workspace = tmp_path / "workspace"

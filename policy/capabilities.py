@@ -8,9 +8,18 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Set
 
 
-AUDIT_DIR = Path(".audit")
-TOKENS_FILE = AUDIT_DIR / "capability_tokens.json"
-REVOCATIONS_FILE = AUDIT_DIR / "capability_revocations.json"
+def _capability_dir() -> Path:
+    from sandbox.mounts import get_runtime_state_root
+
+    return get_runtime_state_root() / "capabilities"
+
+
+def _tokens_file() -> Path:
+    return _capability_dir() / "capability_tokens.json"
+
+
+def _revocations_file() -> Path:
+    return _capability_dir() / "capability_revocations.json"
 
 # Deny reasons (MUST match Sprint A.5)
 MISSING_TOKEN = "MISSING_TOKEN"
@@ -78,27 +87,27 @@ def _load_json(path: Path, default: Any) -> Any:
 
 
 def _save_json(path: Path, obj: Any) -> None:
-    AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _load_tokens() -> Dict[str, Dict[str, Any]]:
     # token_id -> token_dict
-    return _load_json(TOKENS_FILE, default={})
+    return _load_json(_tokens_file(), default={})
 
 
 def _save_tokens(tokens: Dict[str, Dict[str, Any]]) -> None:
-    _save_json(TOKENS_FILE, tokens)
+    _save_json(_tokens_file(), tokens)
 
 
 def _load_revocations() -> Set[str]:
-    data = _load_json(REVOCATIONS_FILE, default={"revoked": []})
+    data = _load_json(_revocations_file(), default={"revoked": []})
     revoked = data.get("revoked", [])
     return set(map(str, revoked))
 
 
 def _save_revocations(revoked: Set[str]) -> None:
-    _save_json(REVOCATIONS_FILE, {"revoked": sorted(revoked)})
+    _save_json(_revocations_file(), {"revoked": sorted(revoked)})
 
 
 def issue_token(

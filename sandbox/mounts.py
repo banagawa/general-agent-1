@@ -43,6 +43,26 @@ def get_workspace_root() -> Path:
     return root
 
 
+def get_runtime_state_root() -> Path:
+    """
+    Return the runtime-state root for the active workspace.
+
+    Runtime state is stored outside the live app root and outside the target
+    worktree. For a workspace at:
+
+        <app_root>/workspace/<workspace_name>
+
+    runtime state lives at:
+
+        <app_root>/workspace/agent_runtime/<workspace_name>
+
+    Existing stores are not migrated by this helper alone.
+    """
+    workspace_root = get_workspace_root()
+    workspace_container = workspace_root.parent
+    return workspace_container / "agent_runtime" / workspace_root.name
+
+
 def _assert_not_live_app_repo(root: Path) -> None:
     app_root = get_app_root()
 
