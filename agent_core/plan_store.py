@@ -5,12 +5,12 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from sandbox.mounts import get_workspace_root
+from sandbox.mounts import get_runtime_state_root
 
 from .plan_schema import Plan, ToolStep
 
 def _plan_root() -> Path:
-    return get_workspace_root() / "plans"
+    return get_runtime_state_root() / "plans"
 
 
 def _pending_dir() -> Path:

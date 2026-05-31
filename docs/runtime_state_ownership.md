@@ -82,6 +82,51 @@ The migration target is `workspace/agent_runtime/<workspace_name>/`, not `worksp
 
 Because runtime bookkeeping is outside the target worktree, runtime writes do not create target workspace drift while source files remain protected by drift detection.
 
+## Plan lifecycle artifacts
+
+Plan lifecycle artifacts are stored under the runtime-state root:
+
+`workspace/agent_runtime/<workspace_name>/plans/`
+
+Examples:
+
+- `plans/pending/`
+- `plans/approved/`
+- `plans/executed/`
+- `plans/failures/`
+- `plans/summaries/`
+
+Historical plan artifacts that already exist under a target worktree are not migrated automatically.
+
+The ownership details and future migration notes are documented in `docs/plan_artifact_ownership.md`.
+
+## Runtime history health monitoring
+
+Runtime history health monitoring is implemented as read-only inspection.
+
+The helper `get_runtime_history_health()` reports total bytes, file count, and warning reason codes for the runtime-state root.
+
+Warning reason codes:
+
+- `RUNTIME_HISTORY_SIZE_WARNING`
+- `RUNTIME_HISTORY_FILE_COUNT_WARNING`
+
+The helper does not delete, compact, archive, migrate, or rewrite runtime history.
+
+Runtime health is report-only. It can appear in plan execution summaries and failure envelopes, but it must not affect execution success, failure classification, rollback, approval, replay, or drift decisions.
+
+## Future runtime history operations
+
+Documented but not implemented yet:
+
+- runtime export tool
+- runtime archive tool
+- runtime migration tool
+- retention policy
+- compaction policy
+- integrity verification
+- checksum verification
+
 ## Non-goals
 
 This contract does not:
