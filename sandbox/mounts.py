@@ -43,6 +43,17 @@ def get_workspace_root() -> Path:
     return root
 
 
+def get_runtime_state_root() -> Path:
+    """
+    Return the workspace-scoped runtime-state root.
+
+    This is a future landing zone for runtime bookkeeping such as audit logs,
+    capability token state, and pending patch state. Existing stores are not
+    migrated by this helper alone.
+    """
+    return get_workspace_root() / ".runtime_state"
+
+
 def _assert_not_live_app_repo(root: Path) -> None:
     app_root = get_app_root()
 

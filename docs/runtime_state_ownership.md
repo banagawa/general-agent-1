@@ -52,6 +52,12 @@ Examples:
 
 These files are runtime records, not source workspace content.
 
+## Runtime-state root
+
+The runtime-state root is `workspace_root/.runtime_state`.
+
+The helper `get_runtime_state_root()` exposes this location without moving current stores.
+
 ## Runtime-state fingerprint exclusion
 
 The workspace fingerprint excludes `.runtime_state/`.
