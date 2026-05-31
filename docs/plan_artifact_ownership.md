@@ -44,13 +44,13 @@ These artifacts are runtime workflow state:
 
 They support the current plan lifecycle and should remain outside target project source.
 
-## Desired future location
+## Current runtime location
 
-The desired future location is:
+New plan lifecycle artifacts are stored under:
 
 `workspace/agent_runtime/<workspace_name>/plans/`
 
-Suggested structure:
+Structure:
 
 - `agent_runtime/<workspace_name>/plans/pending/`
 - `agent_runtime/<workspace_name>/plans/approved/`
@@ -76,6 +76,14 @@ Preferred audit fields:
 - `artifact_kind`
 
 Audit events should not repeatedly embed full plan payloads when the plan artifact already exists as durable runtime history.
+
+## Historical data migration
+
+This change moves new plan lifecycle writes to the runtime-state root.
+
+It does not automatically migrate historical plan artifacts that already exist under a target worktree.
+
+A future runtime migration tool should handle historical data explicitly.
 
 ## Future runtime history operations
 

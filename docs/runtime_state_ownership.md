@@ -84,7 +84,9 @@ Because runtime bookkeeping is outside the target worktree, runtime writes do no
 
 ## Plan lifecycle artifacts
 
-Plan lifecycle artifacts still live under `plans/` in the target worktree.
+Plan lifecycle artifacts are stored under the runtime-state root:
+
+`workspace/agent_runtime/<workspace_name>/plans/`
 
 Examples:
 
@@ -94,11 +96,7 @@ Examples:
 - `plans/failures/`
 - `plans/summaries/`
 
-These artifacts are currently excluded from workspace fingerprinting, but they have not yet been migrated to the runtime-state root.
-
-The desired future location is:
-
-`workspace/agent_runtime/<workspace_name>/plans/`
+Historical plan artifacts that already exist under a target worktree are not migrated automatically.
 
 The ownership details and future migration notes are documented in `docs/plan_artifact_ownership.md`.
 
