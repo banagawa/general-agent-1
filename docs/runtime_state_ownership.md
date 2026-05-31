@@ -113,6 +113,8 @@ Warning reason codes:
 
 The helper does not delete, compact, archive, migrate, or rewrite runtime history.
 
+Runtime health is report-only. It can appear in plan execution summaries and failure envelopes, but it must not affect execution success, failure classification, rollback, approval, replay, or drift decisions.
+
 ## Future runtime history operations
 
 Documented but not implemented yet:

@@ -332,6 +332,32 @@ def _test_summary_from_results(results: List[Dict]) -> Dict:
         "failed": failed,
     }
 
+def _runtime_history_health_summary() -> dict:
+    """
+    Return read-only runtime history health for execution reporting.
+
+    Health reporting is observability only. It must never affect plan success,
+    failure, rollback, approval, replay, or drift decisions.
+    """
+    try:
+        from agent_core.runtime_history_health import get_runtime_history_health
+
+        health = get_runtime_history_health()
+        return {
+            "root": health.root,
+            "exists": health.exists,
+            "total_bytes": health.total_bytes,
+            "file_count": health.file_count,
+            "warnings": list(health.warnings),
+        }
+    except Exception as e:
+        return {
+            "available": False,
+            "error": str(e),
+            "warnings": [],
+        }
+
+
 def _classify_success_or_failure(results: list[dict], error: Exception | None) -> str:
     if error is not None:
         message = str(error).lower()
@@ -415,6 +441,7 @@ def _build_summary(
         "steps_attempted": len(results),
         "steps_completed": len(results),
         "test_summary": _test_summary_from_results(results),
+        "runtime_history_health": _runtime_history_health_summary(),
         "created_paths": created,
         "changed_paths": created + [p for p in modified_paths if p not in created],
         "modified_paths": modified_paths,
@@ -477,6 +504,7 @@ def _build_failure_envelope(
         "patch_edit_paths": patch_edit_paths,
         "error": str(error),
         "test_summary": _test_summary_from_results(results),
+        "runtime_history_health": _runtime_history_health_summary(),
         "requires_new_approval": True,
         "intent": intent,
     }
