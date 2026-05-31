@@ -707,11 +707,17 @@ def _rollback_mutations(plan_hash: str, tx_id: str, snapshots: list[dict]) -> di
         },
     )
 
+    from sandbox.mounts import get_workspace_root
+
+    workspace_root = get_workspace_root().resolve()
+
     for snapshot in rollback_snapshots:
-        path = Path(snapshot["absolute_path"])
+        path = Path(snapshot["absolute_path"]).resolve()
         rel_path = snapshot["path"]
 
         try:
+            path.relative_to(workspace_root)
+
             if snapshot["existed"]:
                 path.write_text(snapshot["content"], encoding="utf-8")
                 report["restored_paths"].append(rel_path)
