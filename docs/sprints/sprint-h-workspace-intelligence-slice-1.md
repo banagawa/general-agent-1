@@ -71,3 +71,43 @@ Run:
 python -m pytest tests/test_workspace_graph.py tests/test_workspace_impact_analysis.py -q
 python -m pytest -q
 ```
+
+
+# Sprint H Slice 3: Artifact Lookup Index
+
+Status: executable implementation slice
+
+## Goal
+
+Add deterministic ArtifactID lookup on top of the read-only workspace graph.
+
+## Scope
+
+- Resolve FILE, MODULE, FUNC, and TEST ArtifactIDs against the graph.
+- Return stable metadata for known artifacts.
+- Return None for unknown but valid ArtifactIDs.
+- Reject malformed ArtifactIDs fail-closed.
+- Keep lookup advisory-only and read-only.
+
+## Non-goals
+
+- No automatic test execution.
+- No new ToolGateway tool.
+- No new policy capability.
+- No plan mutation.
+- No executor or validator change.
+- No external indexing service.
+- No write authority based on graph membership.
+
+## Security invariant
+
+Artifact lookup is advisory data only. A successful lookup does not grant permission, skip policy, bypass ToolGateway, change execution behavior, or authorize workspace mutation.
+
+## Validation
+
+Run:
+
+```text
+python -m pytest tests/test_workspace_graph.py tests/test_workspace_impact_analysis.py tests/test_workspace_artifact_index.py -q
+python -m pytest -q
+```

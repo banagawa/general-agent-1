@@ -38,6 +38,29 @@ class WorkspaceGraph:
     def test_count(self) -> int:
         return sum(len(item.tests) for item in self.files)
 
+
+    def find_artifact(self, artifact: ArtifactID | str) -> dict | None:
+        """Return deterministic metadata for an ArtifactID, or None when absent.
+
+        Lookup is advisory only. Malformed ArtifactIDs fail closed by raising
+        ValueError through ArtifactID.parse. Unknown but valid ArtifactIDs return
+        None and do not trigger execution, mutation, policy, or capability flow.
+        """
+        parsed = ArtifactID.parse(artifact) if isinstance(artifact, str) else artifact
+        target = str(parsed)
+
+        for node in self.files:
+            if parsed.kind == "FILE" and node.artifact_id == target:
+                return _artifact_lookup_record(parsed, node)
+            if parsed.kind == "MODULE" and node.module_id == target:
+                return _artifact_lookup_record(parsed, node)
+            if parsed.kind == "FUNC" and target in node.functions:
+                return _artifact_lookup_record(parsed, node)
+            if parsed.kind == "TEST" and target in node.tests:
+                return _artifact_lookup_record(parsed, node)
+
+        return None
+
     def to_dict(self) -> dict:
         return {
             "root": self.root,
@@ -130,6 +153,18 @@ def impacted_tests_for_modules(graph: WorkspaceGraph, changed_paths: Iterable[st
             selected.extend(node.tests)
 
     return tuple(sorted(set(selected)))
+
+
+def _artifact_lookup_record(artifact: ArtifactID, node: PythonFileNode) -> dict:
+    return {
+        "artifact_id": str(artifact),
+        "kind": artifact.kind,
+        "path": artifact.path,
+        "symbol": artifact.symbol,
+        "file_artifact_id": node.artifact_id,
+        "module_id": node.module_id,
+        "parse_error": node.parse_error,
+    }
 
 
 def _normalize_changed_path(path: str) -> str:
