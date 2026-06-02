@@ -100,6 +100,63 @@ def impacted_tests_for_paths(graph: WorkspaceGraph, changed_paths: Iterable[str]
     return tuple(sorted(set(selected)))
 
 
+def impacted_tests_for_modules(graph: WorkspaceGraph, changed_paths: Iterable[str]) -> tuple[str, ...]:
+    """Return test ArtifactIDs whose files directly import changed Python modules.
+
+    This is advisory only. It does not execute tests, mutate plans, or expand
+    tool authority. The result is deterministic and intentionally conservative:
+    it includes tests in changed test files plus tests in files that directly
+    import modules mapped from changed Python paths.
+    """
+    normalized_paths = {_normalize_changed_path(item) for item in changed_paths}
+    changed_modules = set()
+
+    for changed_path in normalized_paths:
+        module_name = _module_name_from_python_path(changed_path)
+        if module_name is not None:
+            changed_modules.add(module_name)
+
+    selected: list[str] = list(impacted_tests_for_paths(graph, normalized_paths))
+
+    if not changed_modules:
+        return tuple(sorted(set(selected)))
+
+    for node in graph.files:
+        if not node.tests:
+            continue
+        if node.path in normalized_paths:
+            continue
+        if any(imported in changed_modules for imported in node.imports):
+            selected.extend(node.tests)
+
+    return tuple(sorted(set(selected)))
+
+
+def _normalize_changed_path(path: str) -> str:
+    if not isinstance(path, str) or not path.strip():
+        raise ValueError("changed path must be non-empty string")
+    normalized = path.replace("\\", "/")
+    parts = normalized.split("/")
+    if normalized.startswith("/") or normalized.startswith("//"):
+        raise ValueError("changed path must be workspace-relative")
+    if len(path) >= 2 and path[1] == ":":
+        raise ValueError("changed path must not include drive letters")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("changed path must not contain empty, dot, or parent parts")
+    return normalized
+
+
+def _module_name_from_python_path(path: str) -> str | None:
+    if not path.endswith(".py"):
+        return None
+    module_path = path[:-3]
+    if module_path.endswith("/__init__"):
+        module_path = module_path[: -len("/__init__")]
+    if not module_path:
+        return None
+    return module_path.replace("/", ".")
+
+
 def _iter_python_files(root: Path) -> tuple[Path, ...]:
     result: list[Path] = []
     for path in root.rglob("*.py"):
