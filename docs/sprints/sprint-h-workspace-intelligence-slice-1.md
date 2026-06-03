@@ -111,3 +111,44 @@ Run:
 python -m pytest tests/test_workspace_graph.py tests/test_workspace_impact_analysis.py tests/test_workspace_artifact_index.py -q
 python -m pytest -q
 ```
+
+
+# Sprint H Slice 4: Graph Query Helpers
+
+Status: executable implementation slice
+
+## Goal
+
+Add small, deterministic convenience query APIs over the existing ArtifactID lookup index.
+
+## Scope
+
+- Add graph.find_file(path).
+- Add graph.find_module(path).
+- Add graph.find_function(path, symbol).
+- Add graph.find_test(path, test_name).
+- Keep graph.find_artifact(...) as the shared lookup implementation.
+- Add tests for successful lookup, missing lookup, unsafe input rejection, and read-only behavior.
+
+## Non-goals
+
+- No automatic test execution.
+- No new ToolGateway tool.
+- No new policy capability.
+- No plan mutation.
+- No executor or validator change.
+- No external indexing service.
+- No workspace mutation authority based on graph query results.
+
+## Security invariant
+
+Graph query helpers are advisory data only. A successful lookup does not grant permission, skip policy, bypass ToolGateway, change execution behavior, or authorize workspace mutation.
+
+## Validation
+
+Run:
+
+```text
+python -m pytest tests/test_workspace_graph_queries.py -q
+python -m pytest -q
+```
