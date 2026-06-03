@@ -61,6 +61,22 @@ class WorkspaceGraph:
 
         return None
 
+    def find_file(self, path: str) -> dict | None:
+        """Return metadata for a FILE ArtifactID built from a workspace-relative path."""
+        return self.find_artifact(artifact_for_file(path))
+
+    def find_module(self, path: str) -> dict | None:
+        """Return metadata for a MODULE ArtifactID built from a workspace-relative path."""
+        return self.find_artifact(artifact_for_module(path))
+
+    def find_function(self, path: str, symbol: str) -> dict | None:
+        """Return metadata for a FUNC ArtifactID built from path and symbol."""
+        return self.find_artifact(artifact_for_function(path, symbol))
+
+    def find_test(self, path: str, test_name: str) -> dict | None:
+        """Return metadata for a TEST ArtifactID built from path and test name."""
+        return self.find_artifact(artifact_for_test(path, test_name))
+
     def to_dict(self) -> dict:
         return {
             "root": self.root,
