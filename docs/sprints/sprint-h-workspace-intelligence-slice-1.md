@@ -152,3 +152,47 @@ Run:
 python -m pytest tests/test_workspace_graph_queries.py -q
 python -m pytest -q
 ```
+
+
+# Sprint H Slice 5: Static Call Graph Mapping
+
+Status: executable implementation slice
+
+## Goal
+
+Add deterministic read-only call graph extraction for Python functions.
+
+## Scope
+
+- Record direct function call edges discovered from Python AST.
+- Support same-file function calls.
+- Support imported function calls from `from module import symbol`.
+- Support imported module attribute calls from `import module as alias`.
+- Add `graph.calls_from(function_artifact)`.
+- Add `graph.called_by(function_artifact)`.
+- Keep call graph data advisory-only and read-only.
+
+## Non-goals
+
+- No runtime tracing.
+- No dynamic dispatch inference.
+- No automatic test execution.
+- No new ToolGateway tool.
+- No new policy capability.
+- No plan mutation.
+- No executor or validator change.
+- No external indexing service.
+- No workspace mutation authority based on call graph results.
+
+## Security invariant
+
+Call graph mapping is advisory data only. A discovered call edge does not grant permission, skip policy, bypass ToolGateway, change execution behavior, or authorize workspace mutation.
+
+## Validation
+
+Run:
+
+```text
+python -m pytest tests/test_workspace_call_graph.py -q
+python -m pytest -q
+```

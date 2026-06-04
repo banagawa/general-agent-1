@@ -18,6 +18,7 @@ class PythonFileNode:
     imports: tuple[str, ...] = field(default_factory=tuple)
     functions: tuple[str, ...] = field(default_factory=tuple)
     tests: tuple[str, ...] = field(default_factory=tuple)
+    calls: tuple[tuple[str, str], ...] = field(default_factory=tuple)
     parse_error: str | None = None
 
 
@@ -77,6 +78,20 @@ class WorkspaceGraph:
         """Return metadata for a TEST ArtifactID built from path and test name."""
         return self.find_artifact(artifact_for_test(path, test_name))
 
+    def calls_from(self, function: ArtifactID | str) -> tuple[str, ...]:
+        """Return direct static call targets for a FUNC ArtifactID."""
+        parsed = _require_function_artifact(function, "calls_from")
+        source = str(parsed)
+        targets = [target for node in self.files for caller, target in node.calls if caller == source]
+        return tuple(sorted(set(targets)))
+
+    def called_by(self, function: ArtifactID | str) -> tuple[str, ...]:
+        """Return direct static callers for a FUNC ArtifactID."""
+        parsed = _require_function_artifact(function, "called_by")
+        target = str(parsed)
+        callers = [caller for node in self.files for caller, callee in node.calls if callee == target]
+        return tuple(sorted(set(callers)))
+
     def to_dict(self) -> dict:
         return {
             "root": self.root,
@@ -88,6 +103,7 @@ class WorkspaceGraph:
                     "imports": list(node.imports),
                     "functions": list(node.functions),
                     "tests": list(node.tests),
+                    "calls": [[caller, target] for caller, target in node.calls],
                     "parse_error": node.parse_error,
                 }
                 for node in self.files
@@ -171,6 +187,13 @@ def impacted_tests_for_modules(graph: WorkspaceGraph, changed_paths: Iterable[st
     return tuple(sorted(set(selected)))
 
 
+def _require_function_artifact(function: ArtifactID | str, caller: str) -> ArtifactID:
+    parsed = ArtifactID.parse(function) if isinstance(function, str) else function
+    if parsed.kind != "FUNC":
+        raise ValueError(f"{caller} requires FUNC artifact")
+    return parsed
+
+
 def _artifact_lookup_record(artifact: ArtifactID, node: PythonFileNode) -> dict:
     return {
         "artifact_id": str(artifact),
@@ -181,6 +204,77 @@ def _artifact_lookup_record(artifact: ArtifactID, node: PythonFileNode) -> dict:
         "module_id": node.module_id,
         "parse_error": node.parse_error,
     }
+
+
+def _collect_call_edges(rel_path: str, tree: ast.AST) -> tuple[tuple[str, str], ...]:
+    local_functions = {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    imported_symbols: dict[str, tuple[str, str]] = {}
+    module_aliases: dict[str, str] = {}
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                local_name = alias.asname or alias.name.split(".")[0]
+                module_aliases[local_name] = alias.name
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                if alias.name == "*":
+                    continue
+                local_name = alias.asname or alias.name
+                imported_symbols[local_name] = (node.module, alias.name)
+
+    edges: set[tuple[str, str]] = set()
+    for function_node in ast.walk(tree):
+        if not isinstance(function_node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        source = str(artifact_for_function(rel_path, function_node.name))
+        for node in ast.walk(function_node):
+            if not isinstance(node, ast.Call):
+                continue
+            target = _called_artifact_from_expr(
+                rel_path,
+                node.func,
+                local_functions,
+                imported_symbols,
+                module_aliases,
+            )
+            if target is not None and target != source:
+                edges.add((source, target))
+
+    return tuple(sorted(edges))
+
+
+def _called_artifact_from_expr(
+    rel_path: str,
+    expr: ast.expr,
+    local_functions: set[str],
+    imported_symbols: dict[str, tuple[str, str]],
+    module_aliases: dict[str, str],
+) -> str | None:
+    if isinstance(expr, ast.Name):
+        if expr.id in local_functions:
+            return str(artifact_for_function(rel_path, expr.id))
+        imported = imported_symbols.get(expr.id)
+        if imported is not None:
+            module_name, symbol = imported
+            module_path = _python_path_from_module_name(module_name)
+            return str(artifact_for_function(module_path, symbol))
+
+    if isinstance(expr, ast.Attribute) and isinstance(expr.value, ast.Name):
+        module_name = module_aliases.get(expr.value.id)
+        if module_name is not None:
+            module_path = _python_path_from_module_name(module_name)
+            return str(artifact_for_function(module_path, expr.attr))
+
+    return None
+
+
+def _python_path_from_module_name(module_name: str) -> str:
+    return f"{module_name.replace('.', '/')}.py"
 
 
 def _normalize_changed_path(path: str) -> str:
@@ -254,6 +348,8 @@ def _scan_python_file(root: Path, path: Path) -> PythonFileNode:
             if rel_path.startswith("tests/") and node.name.startswith("test_"):
                 tests.append(str(artifact_for_test(rel_path, node.name)))
 
+    calls = _collect_call_edges(rel_path, tree)
+
     return PythonFileNode(
         artifact_id=file_id,
         path=rel_path,
@@ -261,4 +357,5 @@ def _scan_python_file(root: Path, path: Path) -> PythonFileNode:
         imports=tuple(sorted(imports)),
         functions=tuple(sorted(functions)),
         tests=tuple(sorted(tests)),
+        calls=calls,
     )
