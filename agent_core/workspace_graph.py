@@ -187,6 +187,50 @@ def impacted_tests_for_modules(graph: WorkspaceGraph, changed_paths: Iterable[st
     return tuple(sorted(set(selected)))
 
 
+def impacted_tests_for_functions(graph: WorkspaceGraph, changed_functions: Iterable[ArtifactID | str]) -> tuple[str, ...]:
+    """Return tests impacted by changed functions through reverse call edges.
+
+    This is advisory only. It does not execute tests, mutate plans, expand tool
+    authority, or infer dynamic dispatch. Starting from changed FUNC ArtifactIDs,
+    it walks direct static callers until no new callers are found, then returns
+    tests whose functions are in the impacted set.
+    """
+    impacted_functions = _impacted_functions_from_changed_functions(graph, changed_functions)
+    if not impacted_functions:
+        return ()
+
+    selected: list[str] = []
+    for node in graph.files:
+        for test_id in node.tests:
+            function_id = test_id.replace("TEST::", "FUNC::", 1)
+            if function_id in impacted_functions:
+                selected.append(test_id)
+
+    return tuple(sorted(set(selected)))
+
+
+def _impacted_functions_from_changed_functions(
+    graph: WorkspaceGraph,
+    changed_functions: Iterable[ArtifactID | str],
+) -> set[str]:
+    pending = [
+        str(_require_function_artifact(function, "impacted_tests_for_functions"))
+        for function in changed_functions
+    ]
+    impacted: set[str] = set()
+
+    while pending:
+        current = pending.pop(0)
+        if current in impacted:
+            continue
+        impacted.add(current)
+        for caller in graph.called_by(current):
+            if caller not in impacted:
+                pending.append(caller)
+
+    return impacted
+
+
 def _require_function_artifact(function: ArtifactID | str, caller: str) -> ArtifactID:
     parsed = ArtifactID.parse(function) if isinstance(function, str) else function
     if parsed.kind != "FUNC":
