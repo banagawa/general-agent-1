@@ -23,6 +23,20 @@ class PythonFileNode:
 
 
 @dataclass(frozen=True)
+class TestSelection:
+    tests: tuple[str, ...]
+    run_full_suite: bool
+    reasons: tuple[str, ...] = field(default_factory=tuple)
+
+    def to_dict(self) -> dict:
+        return {
+            "tests": list(self.tests),
+            "run_full_suite": self.run_full_suite,
+            "reasons": list(self.reasons),
+        }
+
+
+@dataclass(frozen=True)
 class WorkspaceGraph:
     root: str
     files: tuple[PythonFileNode, ...]
@@ -144,6 +158,55 @@ def build_workspace_graph(workspace_root: Path | None = None, *, audit_rebuild: 
         )
 
     return graph
+
+
+def select_tests_for_changes(
+    graph: WorkspaceGraph,
+    *,
+    changed_paths: Iterable[str] = (),
+    changed_functions: Iterable[ArtifactID | str] = (),
+    full_suite_on_no_selection: bool = True,
+) -> TestSelection:
+    """Return advisory test selection for changed paths and functions.
+
+    This is read-only planner intelligence. It does not execute tests, mutate
+    plans, grant policy authority, or expand ToolGateway scope. When changes
+    are provided but no precise tests are found, the result recommends a full
+    suite run instead of pretending narrow selection is sufficient.
+    """
+    path_changes = tuple(changed_paths)
+    function_changes = tuple(changed_functions)
+
+    selected: set[str] = set()
+    reasons: list[str] = []
+
+    if path_changes:
+        path_tests = impacted_tests_for_modules(graph, path_changes)
+        selected.update(path_tests)
+        reasons.append("changed_paths")
+        if path_tests:
+            reasons.append("path_or_module_impacts")
+
+    if function_changes:
+        function_tests = impacted_tests_for_functions(graph, function_changes)
+        selected.update(function_tests)
+        reasons.append("changed_functions")
+        if function_tests:
+            reasons.append("function_call_impacts")
+
+    has_changes = bool(path_changes or function_changes)
+    run_full_suite = bool(full_suite_on_no_selection and has_changes and not selected)
+
+    if not has_changes:
+        reasons.append("no_changes")
+    elif run_full_suite:
+        reasons.append("no_precise_tests_selected")
+
+    return TestSelection(
+        tests=tuple(sorted(selected)),
+        run_full_suite=run_full_suite,
+        reasons=tuple(dict.fromkeys(reasons)),
+    )
 
 
 def impacted_tests_for_paths(graph: WorkspaceGraph, changed_paths: Iterable[str]) -> tuple[str, ...]:
