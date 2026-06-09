@@ -45,7 +45,7 @@ Filesystem access must remain within WORKSPACE_ROOT. Runtime identity and worksp
 
 4. Typed Mutation Model
 
-The system permits file mutation only through two distinct typed operations:
+The system permits file mutation only through three distinct typed operations:
 
 - `PATCH_APPLY`
   - whole-file replacement only
@@ -59,6 +59,13 @@ The system permits file mutation only through two distinct typed operations:
   - requires literal `old_text` and `new_text`
   - supports optional `occurrence`
   - supports optional `expected_file_sha256_before`
+  - exact-path scoped capability token required
+  - audited
+
+- `FILE_CREATE`
+  - new-file creation only
+  - target file must not already exist
+  - parent directory must already exist
   - exact-path scoped capability token required
   - audited
 
@@ -105,6 +112,7 @@ Current mutation token actions:
 
 - `PATCH_APPLY` → `FS_WRITE_PATCH`
 - `PATCH_EDIT` → `FS_EDIT_PATCH`
+- `FILE_CREATE` → `FS_CREATE_FILE`
 
 - actions remain auditable
 

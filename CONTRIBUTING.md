@@ -25,10 +25,11 @@ Commands must be argv lists and executed with shell=False.
 
 ### Typed File Mutation Rules
 
-Repository mutation uses two distinct tools:
+Repository mutation uses three distinct tools:
 
-- `PATCH_APPLY` for whole-file replacement
-- `PATCH_EDIT` for anchored exact-text replacement
+- `PATCH_APPLY` for whole-file replacement of existing files
+- `PATCH_EDIT` for anchored exact-text edits to existing files
+- `FILE_CREATE` for new-file creation only
 
 Contributors must preserve that separation.
 
@@ -42,6 +43,7 @@ When updating docs, tests, or runtime behavior, keep capability mappings aligned
 
 - `PATCH_APPLY` → `FS_WRITE_PATCH`
 - `PATCH_EDIT` → `FS_EDIT_PATCH`
+- `FILE_CREATE` → `FS_CREATE_FILE`
 
 ### Deny By Default
 

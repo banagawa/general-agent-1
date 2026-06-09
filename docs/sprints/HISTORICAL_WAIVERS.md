@@ -20,3 +20,6 @@ Decision: RESOLVED
 
 Reason:
 Sprint G execution exposed cwd-relative workspace root ambiguity under git worktree execution. No safety bypass, guard weakening, policy relaxation, or ToolGateway bypass was approved. The resolution preserved the workspace guard, clarified app/workspace/test root semantics, and added explicit `TEST_RUN` cwd modes without allowing raw cwd paths. Sprint G resumed after runtime root and workspace root semantics were stabilized.
+
+Current reconciliation:
+The resolved root-hardening work and follow-on Pre-Sprint-H hardening are now part of the current architecture baseline. See `docs/sprints/pre-sprint-h-hardening-closeout-v6.md` and `docs/anchors/current-state-ledger-v6.md`.

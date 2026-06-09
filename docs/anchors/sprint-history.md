@@ -1,5 +1,24 @@
 # Sprint History
 
+## Current merged-state ledger through Sprint H Slice 7
+
+This section reconciles the repository history with merged PRs and commits.
+
+| Area | PRs | Merge commits | Status |
+|---|---|---|---|
+| Worktree root hardening before Sprint G closeout | #10-#11 | `da5d860`, `7f6f552` | Complete |
+| Sprint G deterministic improvement engine | #12 | `e5e0327` | Complete |
+| Pre-Sprint-H hardening | #13-#22 | `52c05fb` through `49eabfc` | Complete |
+| Sprint H workspace intelligence | #23-#29 | `e396a53` through `f79a6e0` | Complete through Slice 7 |
+
+Detailed current-state ledger: `docs/anchors/current-state-ledger-v6.md`.
+
+Pre-Sprint-H hardening closeout: `docs/sprints/pre-sprint-h-hardening-closeout-v6.md`.
+
+Sprint H closeout: `docs/sprints/sprint-h-closeout-v6.md`.
+
+---
+
 ## Sprint G — Deterministic Improvement Engine Foundation
 
 Branch: `sprint-g-deterministic-improvement-engine`

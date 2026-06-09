@@ -48,6 +48,7 @@ scoped, expiring, token-based capabilities checked per tool invocation.
 
 - `FS_WRITE_PATCH`
 - `FS_EDIT_PATCH`
+- `FS_CREATE_FILE`
 - `CMD_RUN`
 - `GIT_RUN`
 

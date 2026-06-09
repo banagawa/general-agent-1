@@ -196,3 +196,35 @@ Run:
 python -m pytest tests/test_workspace_call_graph.py -q
 python -m pytest -q
 ```
+
+
+# Sprint H Current State After Slice 7
+
+Status: complete through intelligent advisory test selection
+
+## Additional completed slices
+
+- Slice 6: Function-Level Impact Propagation (`docs/sprints/sprint-h-workspace-intelligence-slice-6-v6.md`)
+- Slice 7: Intelligent Test Selection (`docs/sprints/sprint-h-workspace-intelligence-slice-7-v1.md`)
+
+## Current advisory flow
+
+```text
+changed paths/functions
+        ↓
+workspace graph
+        ↓
+path/module impact + function impact
+        ↓
+deterministic test recommendations
+        ↓
+full-suite fallback recommendation when precise selection is unavailable
+```
+
+## Boundary
+
+The completed Sprint H layer remains advisory only. It does not execute tests, mutate plans, bypass ToolGateway or PolicyEngine, expand capabilities, or authorize workspace mutation.
+
+## Closeout
+
+See `docs/sprints/sprint-h-closeout-v6.md` and `docs/anchors/current-state-ledger-v6.md`.

@@ -13,7 +13,7 @@ Scope
 -----
 This document covers:
 - how plan.submit input must be provided
-- what PATCH_APPLY means in this runtime
+- what PATCH_APPLY, PATCH_EDIT, and FILE_CREATE mean in this runtime
 - what validator constraints were observed
 - what metadata is automated versus manually supplied
 - how to safely prepare implementation plans
@@ -478,12 +478,12 @@ Conservative safe pattern:
 - or pre-create an empty/stub file outside the plan if that is part of the approved/manual setup
 - then use PATCH_APPLY to replace the file contents deterministically
 
-Correct planning assumption:
-PATCH_APPLY = replace exact contents at an already-resolved workspace-relative path
+Correct planning assumptions:
+PATCH_APPLY = replace exact contents of an already-existing workspace-relative file
+PATCH_EDIT = replace exact anchored text inside an already-existing workspace-relative file
+FILE_CREATE = create a new file at a workspace-relative path, with no overwrite and no implicit mkdir
 
-Do not assume:
-PATCH_APPLY = replace exact contents at an already-existing workspace-relative path
-FILE_CREATE = create a new file at a workspace-relative path (no overwrite, no implicit mkdir)
+Do not assume any operation implicitly converts between create and modify behavior.
 
 Safe Planning Rule For Existing Files
 -------------------------------------

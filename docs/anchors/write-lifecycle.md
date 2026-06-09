@@ -83,6 +83,30 @@ Do not use when:
 
 ---
 
+## FILE_CREATE Lifecycle
+
+`FILE_CREATE` is used for new-file creation only.
+
+Rules:
+
+- target file must not already exist
+- parent directory must already exist
+- request must provide workspace-relative `path`
+- request must provide complete file `content`
+- execution requires approval
+- execution requires exact-path scoped capability token
+- execution is audited
+
+Use when:
+- the target path is intentionally new
+
+Do not use when:
+- the target file already exists
+- parent directories must be created implicitly
+- the operation should modify existing content
+
+---
+
 ## PATCH_EDIT Matching Rules
 
 - 0 exact matches denies
