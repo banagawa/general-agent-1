@@ -150,7 +150,21 @@ Required properties:
 
 ---
 
-## 8. Drift binding
+## 8. Workspace intelligence advisory boundary
+
+Workspace intelligence may describe repository structure and recommend impacted tests.
+
+Required properties:
+- graph data is advisory only
+- ArtifactID lookup does not grant permission
+- dependency and call graph data does not bypass ToolGateway or PolicyEngine
+- test selection does not execute tests
+- selector output does not mutate plans
+- graph membership never authorizes workspace mutation
+
+---
+
+## 9. Drift binding
 
 Approval binds to workspace state.
 
@@ -162,7 +176,7 @@ Required properties:
 
 ---
 
-## 8. Atomic and fail-closed mutation
+## 10. Atomic and fail-closed mutation
 
 `PATCH_EDIT` multi-edit behavior must remain atomic:
 - edits apply in order to in-memory content
@@ -173,7 +187,7 @@ All mutation paths must fail closed.
 
 ---
 
-## 9. Append-only audit
+## 11. Append-only audit
 
 Allow and deny paths must both be logged.
 

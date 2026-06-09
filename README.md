@@ -38,16 +38,20 @@ Bounded autonomy remains approval-bound and feature-flag gated.
 
 Sprint F is complete.
 
-Sprint G was temporarily paused during worktree runtime resolution hardening while app_root/workspace_root semantics were stabilized.
+Sprint G is complete. It added deterministic outcome normalization, inert strategy/proposal records, append-only strategy registry writes, deterministic proposal generation, and a post-cycle proposal hook. Strategy installation remains explicitly out of scope and approval-gated for any future work.
 
-Sprint G deterministic improvement foundation is now complete.
+Pre-Sprint-H hardening is complete. It added TEST_RUN allowlisting, approval-time mutation validation, path/capability hardening, runtime-state ownership, runtime history health reporting, rollback boundary rechecks, root authority invariant tests, ToolGateway static guards, denial audit observability, and the workspace-intelligence authority boundary.
 
-Current Sprint G behavior:
+Sprint H is complete through Slice 7. The workspace intelligence layer now includes ArtifactIDs, workspace graph construction, dependency-aware impact analysis, ArtifactID lookups, graph query helpers, static call graph mapping, function-level impact propagation, and intelligent advisory test selection.
+
+Current Sprint G/H behavior:
 - execution outcomes are normalized through `CycleOutcome`
 - strategies and proposals are inert data only
 - strategy registry records are append-only JSONL
 - proposal generation is deterministic from execution outcomes
 - proposal hook is post-cycle only and does not auto-install strategies
+- workspace intelligence is advisory only and never grants authority
+- intelligent test selection recommends tests and can recommend full-suite fallback; it does not run tests
 
 Runtime test execution supports explicit TEST_RUN cwd selection:
 - `cwd: "workspace"` tests the configured workspace/worktree
@@ -234,7 +238,7 @@ Current step-to-capability mapping:
 
 # Typed Mutation Model
 
-Two write tools now exist and they stay distinct:
+Three write tools now exist and they stay distinct:
 
 - `PATCH_APPLY`
   - whole-file replacement only
@@ -247,6 +251,13 @@ Two write tools now exist and they stay distinct:
   - target file must already exist
   - supports `old_text`, `new_text`, optional `occurrence`
   - optional `expected_file_sha256_before`
+  - exact-path scoped token
+  - audited
+
+- `FILE_CREATE`
+  - new-file creation only
+  - target file must not already exist
+  - parent directory must already exist
   - exact-path scoped token
   - audited
 
@@ -363,10 +374,27 @@ Once a plan enters `IN_FLIGHT`, that approval is consumed.
 A rerun requires explicit new approval.
 
 ---
+# Workspace Intelligence Layer
 
+Sprint H is complete through Slice 7.
+
+Current advisory APIs include:
+
+- `ArtifactID` parsing/formatting/validation.
+- `build_workspace_graph(...)`.
+- `WorkspaceGraph.find_artifact(...)` and convenience query helpers.
+- `WorkspaceGraph.calls_from(...)` and `WorkspaceGraph.called_by(...)`.
+- `impacted_tests_for_paths(...)`.
+- `impacted_tests_for_modules(...)`.
+- `impacted_tests_for_functions(...)`.
+- `select_tests_for_changes(...)` returning `TestSelection`.
+
+Workspace intelligence is advisory planner data only. It may recommend impacted tests or fallback to the full suite. It does not execute tests, mutate plans, grant permissions, bypass policy, or authorize workspace mutation.
+
+---
 # Project Status
 
-| Sprint | Status |
+| Area | Status |
 |---|---|
 | Sprint A | Complete |
 | Sprint B | Complete |
@@ -375,11 +403,14 @@ A rerun requires explicit new approval.
 | Sprint E | Complete |
 | Sprint F | Complete |
 | Sprint G | Complete |
+| Pre-Sprint-H hardening | Complete |
+| Sprint H | Complete through Slice 7 |
 
 ---
 
-# Next Phase
+# Current Documentation Index
 
-Sprint H: Workspace Intelligence Layer
-
-Sprint H is not described here as merged runtime behavior.
+- `docs/anchors/current-state-ledger-v6.md` records merged PR/commit state through Sprint H Slice 7.
+- `docs/sprints/pre-sprint-h-hardening-closeout-v6.md` records the hardening sequence after Sprint G.
+- `docs/sprints/sprint-h-closeout-v6.md` records Sprint H Slice 1 through Slice 7.
+- `docs/non-python-reconciliation-inventory-v6.md` records the non-Python documentation reconciliation scope.

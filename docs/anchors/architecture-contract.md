@@ -96,7 +96,7 @@ The runtime uses explicit root semantics:
 - no silent direct overwrite path
 - mutation must remain diff-visible
 - mutation must stay scoped to approved tool behavior
-- `PATCH_APPLY` and `PATCH_EDIT` remain separate typed operations
+- `PATCH_APPLY`, `PATCH_EDIT`, and `FILE_CREATE` remain separate typed operations
 
 ### 5. Explicit approval before execution
 - mutation-capable execution requires a plan artifact
@@ -143,6 +143,13 @@ If anything unexpected occurs:
 - exact `old_text` to exact `new_text`
 - optional 1-based `occurrence`
 - optional `expected_file_sha256_before`
+- exact-path scoped token
+- audited
+
+### FILE_CREATE
+- new-file creation only
+- target file must not already exist
+- parent directory must already exist
 - exact-path scoped token
 - audited
 
@@ -205,6 +212,24 @@ Execution denials include at least:
 - workspace drift detected
 - step cap exceeded
 - time budget exceeded
+
+---
+
+## Workspace Intelligence Boundary
+
+Workspace intelligence may describe repository structure, dependencies, call relationships, impacted tests, and ArtifactID metadata.
+
+Workspace intelligence may not:
+- execute tools
+- mutate files
+- mutate plans
+- bypass ToolGateway
+- bypass PolicyEngine
+- grant permissions
+- expand capabilities
+- authorize workspace mutation
+
+`select_tests_for_changes(...)` is advisory only. It recommends tests and full-suite fallback; it does not run tests.
 
 ---
 

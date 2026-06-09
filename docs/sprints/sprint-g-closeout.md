@@ -40,3 +40,8 @@ Operator notes:
 
 Validation:
 - full pytest suite passed after Sprint G implementation
+
+Follow-on hardening:
+- PR #13 through PR #22 are part of the current architecture baseline after Sprint G.
+- They stabilized TEST_RUN allowlisting, approval-time mutation validation, path/capability safety, runtime-state ownership, runtime history health reporting, rollback boundary checks, root authority invariants, ToolGateway guards, denial audit observability, and the Sprint H advisory boundary.
+- See `docs/sprints/pre-sprint-h-hardening-closeout-v6.md` and `docs/anchors/current-state-ledger-v6.md`.

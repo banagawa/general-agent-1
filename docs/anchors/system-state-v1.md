@@ -1,6 +1,6 @@
 # System State v1
 
-This document describes the merged system state after Sprint G plus the current typed mutation, worktree-safe root model, and deterministic strategy foundation.
+This document describes the merged system state after Sprint H Slice 7, including Sprint G, pre-Sprint-H hardening, typed mutation, worktree-safe root separation, runtime-state ownership, and the workspace intelligence layer.
 
 ---
 
@@ -46,6 +46,7 @@ The system currently maintains these invariants:
 - reason-coded deny audit
 - Sprint F controlled autonomy completed
 - worktree-safe runtime/workspace root separation
+- workspace intelligence is advisory only and never grants authority
 
 ---
 
@@ -264,18 +265,37 @@ Typed mutation audit events include:
 
 Sprint F is complete.
 
-Sprint G deterministic improvement foundation is complete.
+Sprint G deterministic improvement foundation is complete:
+- execution outcomes are normalized through `CycleOutcome`.
+- strategy records and proposals are inert data.
+- registry writes are append-only JSONL.
+- proposal generation is deterministic from execution outcomes.
+- proposal integration is post-cycle only.
+- proposal generation does not auto-install strategies.
+- `TEST_RUN` supports explicit cwd modes: `workspace` and `app`.
 
-Current completed Sprint G behavior:
-- execution outcomes are normalized through `CycleOutcome`
-- strategy records and proposals are inert data
-- registry writes are append-only JSONL
-- proposal generation is deterministic from execution outcomes
-- proposal integration is post-cycle only
-- proposal generation does not auto-install strategies
-- `TEST_RUN` supports explicit cwd modes: `workspace` and `app`
+Pre-Sprint-H hardening is complete:
+- TEST_RUN allowlisting.
+- approval-time mutation/file-state validation.
+- path hygiene and capability-scope hardening.
+- runtime-state ownership and runtime history health reporting.
+- rollback boundary rechecks.
+- root authority invariant tests.
+- ToolGateway static guards.
+- denial audit observability.
+- workspace intelligence boundary guardrail.
 
-Future strategy installation remains approval-gated and out of scope for this completed foundation.
+Sprint H is complete through Slice 7:
+- ArtifactID model.
+- read-only workspace graph.
+- dependency-aware impact analysis.
+- ArtifactID lookup index.
+- graph query helpers.
+- static call graph mapping.
+- function-level impact propagation.
+- intelligent advisory test selection through `select_tests_for_changes(...)`.
+
+Future strategy installation remains approval-gated and out of scope for the completed Sprint G foundation. Future workspace intelligence consumers must preserve the advisory-only boundary.
 
 ---
 
